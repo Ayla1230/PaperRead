@@ -1,6 +1,6 @@
 {
   "name": "paperread-desktop",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "PaperRead personal research workspace",
   "author": {
     "name": "YuriyLin"
@@ -100,7 +100,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "YuriyLin",
+        "owner": "Ayla1230",
         "repo": "PaperRead"
       }
     ]

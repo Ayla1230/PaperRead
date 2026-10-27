@@ -16,7 +16,8 @@ from . import __version__, config, http
 from .log import log
 from .store import read_json, write_json_atomic
 
-REPO = os.environ.get("EASYREAD_UPDATE_REPOSITORY", "YuriyLin/PaperRead").strip()
+# 這是 Ayla1230 的修改版：只從自己的 Fork 檢查更新，免得被原作者的版本蓋掉
+REPO = os.environ.get("EASYREAD_UPDATE_REPOSITORY", "Ayla1230/PaperRead").strip()
 API = f"https://api.github.com/repos/{REPO}/releases/latest" if REPO else ""
 EVERY = 24 * 3600   # 成功问到后多久再问
 RETRY = 3 * 3600    # 没问到（没网）多久后再试
