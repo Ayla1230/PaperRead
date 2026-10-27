@@ -99,9 +99,9 @@ def _char_box(box, bounds, rotation: int) -> list[float] | None:
     return [round(v, 4) for v in (x0, y0, x1, y1)]
 
 
-def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 3.0) -> str:
-    """box 是按页宽高归一化的 [x0, y0, x1, y1]；输出到 figures/，返回相对路径。"""
-    with open_pdf(root / "source.pdf") as doc:
+def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 3.0, pdf: Path | None = None) -> str:
+    """box 是按页宽高归一化的 [x0, y0, x1, y1]；输出到 figures/，返回相对路径。pdf：连结的原 PDF（默认 source.pdf）。"""
+    with open_pdf(pdf or root / "source.pdf") as doc:
         with closing(doc[page - 1]) as pdf_page, closing(pdf_page.render(scale=scale)) as bitmap:
             with bitmap.to_pil() as raw, raw.convert("RGB") as img:
                 W, H = img.size

@@ -16,7 +16,7 @@ def normalize(data: dict) -> None:
         if isinstance(value, dict):
             original = value.get("zh")
             for key, child in list(value.items()):
-                if key in ("zh", "caption_zh", "title_zh", "short_zh") and isinstance(child, str):
+                if key in ("zh", "caption_zh", "image_zh", "title_zh", "short_zh") and isinstance(child, str):
                     value[key] = convert(child)
                 elif key == "zh" and isinstance(child, dict):
                     value[key] = {k: convert(v) if isinstance(v, str) else v for k, v in child.items()}

@@ -42,7 +42,7 @@
     if (!hits.length) return;
     active = active < 0 ? (step < 0 ? hits.length - 1 : 0) : (active + step + hits.length) % hits.length;
     const hit = hits[active];
-    if (!hit.range.getClientRects().length && PR.readingView() !== "both") PR.setView("both");
+    if (!hit.range.getClientRects().length && !["both", "sentence"].includes(PR.readingView())) PR.setView("both");
     PR.$$("#paper .flash").forEach((el) => el.classList.remove("flash"));
     PR.jumpTo(hit.block.id, { noFlash: true, instant: true });
     paint();

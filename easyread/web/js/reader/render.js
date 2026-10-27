@@ -25,7 +25,7 @@
   PR.blockKeys = function (b) {
     if (b.type === "list") return (Array.isArray(b.items) ? b.items : []).map((_, i) => b.id + "#" + i);
     if (b.type === "table") return [b.id + "#caption"];
-    if (b.type === "figure") return [b.id + "#caption"];
+    if (b.type === "figure") return [b.id + "#caption"].concat(b.image_zh || b.image_en ? [b.id + "#image"] : []);
     if (b.type === "math" || b.type === "references" || b.type === "note") return [];
     return [b.id];
   };
@@ -68,6 +68,19 @@
     const en = PR.isEnKey(key) ? ' lang="en"' : "";
     return '<div class="caption"><div class="zh' + (en ? " en-main" : "") + '"' + en + ' data-key="' + key + '">' + body + staleTag(key) + "</div>" + enIfZh(key, b.caption_en) + "</div>";
   }
+  function tableRows(value) {
+    if (!Array.isArray(value) || !value.length) return [];
+    if (value.every((row) => !Array.isArray(row))) return [value];
+    return value.map((row) => Array.isArray(row) ? row : [row]);
+  }
+  function cell(c) { return PR.md(String(c), { xref: false, cite: false }).replace(/<br>(\([^<]*\))/g, '<br><span class="sub">$1</span>'); }
+  /* 图还没截出来（旧论文、模型没给框）：直接把原页图放在译文里，不用跳去原页才看得到 */
+  function pageImageHtml(b, label) {
+    const p = ((S.paper.meta || {}).pages || []).find((x) => x.n === b.page);
+    if (!p || !p.img || !PR.imageUrl(p.img)) return '<button class="fig-missing" data-t="page">' + PR.t("图见原文第 {n} 页（点击查看）", { n: b.page }) + "</button>";
+    return '<figure class="fig-page"><img data-t="page" loading="lazy" src="' + PR.imageUrl(p.img) + '" alt="' + PR.esc(label) + '">' +
+      '<figcaption><button class="link" data-t="page">' + PR.esc(label) + "</button></figcaption></figure>";
+  }
   function linkify(t) { return PR.esc(t).replace(/(https?:\/\/[^\s<]+[^\s<.,;)])/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
 
   const R = {
@@ -86,15 +99,25 @@
     },
     math: (b) => '<div class="math-row"><div class="math-body" tabindex="0" role="button" aria-label="' + PR.t("公式，點擊可選擇螢光筆或底線") + '">' + PR.tex(b.tex, true) + "</div>" + (b.tag ? '<div class="math-tag">(' + PR.esc(b.tag) + ")</div>" : "") + "</div>",
     table(b) {
-      const placeholder = '<button class="fig-placeholder table-placeholder" data-t="page" aria-label="' + PR.t("表格保留於原文") + '">' +
-        '<span>' + PR.t("表格保留於原文") + '</span><small>' + PR.t("表格位於原文第 {n} 頁（點擊查看）", { n: b.page }) + '</small></button>';
-      const table = '<div class="figure-media">' + placeholder + '</div>';
+      const head0 = tableRows(b.head), rows0 = tableRows(b.rows);
+      let table;
+      if (!head0.length && !rows0.length) {
+        table = '<div class="figure-media">' + pageImageHtml(b, PR.t("表格见原文第 {n} 页（点击放大）", { n: b.page })) + "</div>";
+      } else {
+        const al = (b.align || "").split("");
+        const style = (i) => (al[i] ? ' style="text-align:' + ({ l: "left", r: "right", c: "center" }[al[i]] || "left") + '"' : "");
+        const head = head0.map((r) => "<tr>" + r.map((c, i) => "<th" + style(i) + ">" + cell(c) + "</th>").join("") + "</tr>").join("");
+        const rows = rows0.map((r) => "<tr>" + r.map((c, i) => "<td" + style(i) + ">" + cell(c) + "</td>").join("") + "</tr>").join("");
+        table = '<div class="tbl-wrap"><table class="tbl"><thead>' + head + "</thead><tbody>" + rows + "</tbody></table></div>" +
+          '<button class="tbl-orig link" data-t="page">' + PR.t("对照原文第 {n} 页的原表", { n: b.page }) + "</button>";
+      }
       return b.caption_pos === "above" ? captionHtml(b) + table : table + captionHtml(b);
     },
     figure(b) {
-      const placeholder = '<button class="fig-placeholder" data-t="page" aria-label="' + PR.t("圖表保留於原文") + '">' +
-        '<span>' + PR.t("圖表保留於原文") + '</span><small>' + PR.t("圖見原文第 {n} 頁（點擊查看）", { n: b.page }) + '</small></button>';
-      return '<div class="figure-media">' + placeholder + '</div>' + captionHtml(b);
+      const img = b.src ? '<img src="' + PR.imageUrl(b.src) + '" alt="" loading="lazy">' : pageImageHtml(b, PR.t("图在原文第 {n} 页（点击放大）", { n: b.page }));
+      const key = b.id + "#image";
+      const imageText = b.image_zh || b.image_en ? '<div class="figure-translation"><div class="figure-translation-label">' + PR.t("图内文字") + '</div>' + zhDiv(key) + enIfZh(key, b.image_en) + '</div>' : "";
+      return '<div class="figure-media">' + img + '</div>' + imageText + captionHtml(b);
     },
     note: (b) => '<div class="inline-note"><div class="lbl">' + PR.t("阅读批注（非原文）") + "</div>" + PR.mdBlocks(b.zh) + "</div>",
     references(b) {

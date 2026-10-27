@@ -629,7 +629,71 @@ SOURCE_ALIASES = {
     "ICLR": "International Conference on Learning Representations",
     "AAAI": "AAAI Conference on Artificial Intelligence",
     "IJCAI": "International Joint Conference on Artificial Intelligence",
+    # 管理學與社會科學常用縮寫
+    "AMJ": "Academy of Management Journal",
+    "AMR": "Academy of Management Review",
+    "ASQ": "Administrative Science Quarterly",
+    "SMJ": "Strategic Management Journal",
+    "JOM": "Journal of Management",
+    "JMS": "Journal of Management Studies",
+    "JIBS": "Journal of International Business Studies",
+    "JAP": "Journal of Applied Psychology",
+    "JBV": "Journal of Business Venturing",
+    "MISQ": "MIS Quarterly",
+    "JMR": "Journal of Marketing Research",
+    "JCR": "Journal of Consumer Research",
+    "AJAE": "American Journal of Agricultural Economics",
+    "ERAE": "European Review of Agricultural Economics",
 }
+
+# 研究探索“出版來源”旁的期刊清單：點一下就把整串期刊名稱帶進來查。
+# 只是常見期刊的名稱，不代表任何評等（SSCI、ABS 等官方清單請以發布機構為準）；
+# 使用者可以把自己的清單存起來（prefs.json 的 research.journal_lists）。
+JOURNAL_PRESETS = [
+    {"id": "agri", "name": "農業經濟與農業系統", "journals": [  # i18n-ok: 期刊清單名稱，研究工作區固定使用繁體中文。
+        "Agricultural Systems", "Journal of Rural Studies", "Food Policy", "Land Use Policy", "Ecological Economics",
+        "American Journal of Agricultural Economics", "European Review of Agricultural Economics",
+        "Journal of Agricultural Economics", "Agriculture and Human Values", "Renewable Agriculture and Food Systems"]},
+    {"id": "mgmt", "name": "管理學主要期刊", "journals": [  # i18n-ok: 期刊清單名稱，研究工作區固定使用繁體中文。
+        "Academy of Management Journal", "Academy of Management Review", "Administrative Science Quarterly",
+        "Strategic Management Journal", "Organization Science", "Management Science", "Journal of Management",
+        "Journal of Management Studies", "Journal of International Business Studies", "Journal of Applied Psychology"]},
+    {"id": "behavior", "name": "行為、環境與永續", "journals": [  # i18n-ok: 期刊清單名稱，研究工作區固定使用繁體中文。
+        "Journal of Environmental Psychology", "Environment and Behavior", "Journal of Applied Social Psychology",
+        "British Journal of Social Psychology", "Business Strategy and the Environment", "Journal of Business Ethics",
+        "Journal of Cleaner Production", "Psychology & Marketing"]},
+]
+MAX_JOURNAL_LISTS = 20
+
+
+def journal_lists() -> dict:
+    from . import prefs
+    custom = (prefs.load().get("research") or {}).get("journal_lists") or []
+    return {"presets": JOURNAL_PRESETS, "custom": [x for x in custom if isinstance(x, dict) and x.get("name") and x.get("journals")]}
+
+
+def save_journal_lists(lists) -> dict:
+    """整份覆寫使用者自己的期刊清單；每份最多 10 本（研究探索一次最多查 10 個來源名稱）。"""
+    from . import prefs
+    if not isinstance(lists, list) or len(lists) > MAX_JOURNAL_LISTS:
+        raise ValueError(f"期刊清單最多 {MAX_JOURNAL_LISTS} 份。")  # i18n-ok: Research 工作區訊息依產品規格固定使用繁體中文。
+    clean, seen = [], set()
+    for raw in lists:
+        if not isinstance(raw, dict):
+            continue
+        name = re.sub(r"\s+", " ", str(raw.get("name") or "")).strip()[:60]
+        journals = raw.get("journals")
+        if isinstance(journals, str):
+            journals = re.split(r"[,，、;；|\n]+", journals)  # i18n-ok: 分隔符號
+        journals = list(dict.fromkeys(j for j in (re.sub(r"\s+", " ", str(x)).strip()[:120] for x in (journals or [])) if j))
+        if not name or not journals or name.casefold() in seen:
+            continue
+        if len(journals) > 10:
+            raise ValueError("每份期刊清單最多 10 本期刊（一次最多查 10 個出版來源）。")  # i18n-ok: Research 工作區訊息依產品規格固定使用繁體中文。
+        seen.add(name.casefold())
+        clean.append({"name": name, "journals": journals})
+    prefs.save({"research": {"journal_lists": clean}})
+    return journal_lists()
 
 
 def _source_terms(query: str) -> list[str]:
@@ -866,6 +930,8 @@ def get(app, path_query: str):
         return {**state, "items": items, "candidates": planning_store.candidates(_root(app)),
                 "summaries": planning_store.summaries_list(_root(app)), "categories": tags,
                 "provider": "OpenAlex", "api_key_required": False}
+    if endpoint == "journal-lists":
+        return journal_lists()
     if endpoint == "reading-path/latest":
         snapshot = planning_store.latest_reading_path(_root(app))
         return {"path": snapshot, "found": bool(snapshot)}
@@ -1325,6 +1391,8 @@ def post(app, endpoint: str, body: dict, *, _cancel=None, _report=None):
     endpoint = "/" + str(endpoint or "").strip("/")
     root = _root(app)
     body = body if isinstance(body, dict) else {}
+    if endpoint == "/journal-lists":
+        return save_journal_lists(body.get("lists"))
     if endpoint == "/export/obsidian":
         return obsidian_export.export_to_vault(body.get("documents"))
     if endpoint == "/export/zip":
@@ -1525,6 +1593,7 @@ def post(app, endpoint: str, body: dict, *, _cancel=None, _report=None):
             "   - `核心發現與成果`：主要實驗結論、SOTA 對比成果、消融實驗 (Ablation) 洞察。\n"  # i18n-ok: prompt
             "   - `研究貢獻與創新`：核心學術突破、方法創新或實務價值。\n"  # i18n-ok: prompt
             "   - `局限性與未來方向`：方法邊界、未解決問題或改進方向（若原文未提及可精簡或略過）。\n"  # i18n-ok: prompt
+            "   若論文是實證社會科學研究（問卷、計量、結構方程等），改用 `理論框架與假設`（採用或延伸的理論、各假設）、`研究變數與構面`（自變數、中介、調節、依變數與控制變數）、`測量與樣本`（量表來源、題數、樣本與情境）、`分析方法`、`假設檢定結果`（支持與否、係數）取代偏工程的分支，其餘分支照常保留。\n"  # i18n-ok: prompt
             "3. 層級深度：建議展開至 3 至 4 層；主要分支下設 2 至 4 個子分支（二級節點），末端節點（三級/四級節點）列出具體變數、數據指標、方法細節。\n\n"  # i18n-ok: prompt
             "【節點內容與視覺渲染強化】\n"  # i18n-ok: prompt
             "1. 精煉原則：節點文字必須精簡有力（建議控制在 6 至 20 個字），使用名詞短語或精要摘要，嚴禁整段複製長句。\n"  # i18n-ok: prompt

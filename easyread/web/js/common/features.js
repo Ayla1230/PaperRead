@@ -20,7 +20,7 @@
     ["research", PR.t("研究"), "r", PR.t("面板")],
     ["inkToggle", PR.t("切換手寫"), "w", PR.t("手寫工具")], ["inkEraser", PR.t("切換橡皮擦"), "x", PR.t("手寫工具")],
     ["next", PR.t("下一段"), "j", PR.t("阅读")], ["prev", PR.t("上一段"), "k", PR.t("阅读")],
-    ["mode", PR.t("单语 / 双语"), "b", PR.t("阅读")], ["toc", PR.t("目录"), "t", PR.t("阅读")],
+    ["mode", PR.t("单语 / 双语 / 逐句"), "b", PR.t("阅读")], ["toc", PR.t("目录"), "t", PR.t("阅读")],
     ["fontUp", PR.t("字号变大"), "=", PR.t("阅读")], ["fontDown", PR.t("字号变小"), "-", PR.t("阅读")], ["fontReset", PR.t("恢复默认字号"), "0", PR.t("阅读")],
     ["notes", PR.t("笔记面板"), "m", PR.t("面板")], ["chat", PR.t("问 AI（带当前段）"), "a", PR.t("面板"), "chat"],
     ["pages", PR.t("原页面板"), "o", PR.t("面板"), "pages"], ["pagePrev", PR.t("原页上一页"), "[", PR.t("面板"), "pages"], ["pageNext", PR.t("原页下一页"), "]", PR.t("面板"), "pages"],

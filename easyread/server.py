@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from . import __version__, answer_styles, figures, chat, chat_models, chat_store, cli_models, config, detect, engines, i18n, langs, notehelp, open_link, paperdata, pdfwork, prefs, settings_api, trash, library_api, translate_api, updates, usage, wsock, jobs_api, presets as api_presets
+from . import __version__, answer_styles, ask, figures, chat, chat_models, chat_store, cli_models, config, detect, engines, i18n, langs, notehelp, open_link, paperdata, pdfwork, prefs, settings_api, trash, library_api, translate_api, updates, usage, wsock, jobs_api, presets as api_presets
 from .bulk import api as bulk_api
 from .research import api as research_api
 from . import research_v2
@@ -207,6 +207,36 @@ class Handler(BaseHTTPRequestHandler):
                 if path.relative_to(ws.root.resolve()).as_posix() not in retained:
                     path.unlink(missing_ok=True)
 
+    def _ask(self, body: dict):
+        """文献库首页的问 AI，流式输出，格式同 _chat。参数不对在开始输出前就报错（400）。"""
+        text = str(body.get("text") or "").strip()
+        if not text:
+            raise ValueError(tr("问题是空的"))
+        ask.engine_cfg(config.load(), body.get("model"))  # 没有 API 模型：直接告诉页面去设置
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.close_connection = True
+        cancel = threading.Event()
+
+        def send(obj):
+            self.wfile.write((json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8"))
+            self.wfile.flush()
+        try:
+            ask.stream_answer(self.app.lib, body, send, cancel)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            cancel.set()
+        except engines.Cancelled:
+            pass
+        except Exception as e:  # noqa: BLE001
+            log.exception("首页问 AI 出错")
+            try:
+                send({"error": str(e)[:500]})
+            except OSError:
+                pass
+
     def _body(self) -> bytes:
         n = int(self.headers.get("Content-Length", "0"))
         if n > MAX_UPLOAD:
@@ -291,6 +321,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"found": found, "ready": detect.ready(cfg, found), "engine": cfg.get("engine"), "models": cli_models.listing()})
         if path == "/api/prefs":
             return self._json(200, prefs.load())
+        if path == "/api/ask":  # 文献库首页的“问 AI”：对话记录和能用的 API 模型
+            return self._json(200, {"threads": ask.threads(), **ask.models()})
         if path == "/api/chat/models":
             return self._json(200, chat_models.listing(config.load()))
         if path == "/api/log":
@@ -327,7 +359,7 @@ class Handler(BaseHTTPRequestHandler):
                          "engine": config.load().get("engine")}
                 # 旧论文的图按定位框补截图；等内容和版本号都取完再开始，页面轮询到 paper 变了就会重画
                 if app.location.status == "idle" and (state["job"] or {}).get("state") not in ("queued", "running"):
-                    pass  # PaperRead does not generate cropped figure assets.
+                    figures.fill_later(ws, app.location)
                 return self._json(200, state)
             if action == "versions":
                 return self._json(200, {**ws.versions(), "library_status": app.location.status})
@@ -412,6 +444,10 @@ class Handler(BaseHTTPRequestHandler):
             result = research_v2.post(app, endpoint, json.loads(self._body() or b"{}"))
             return self._json(200, result)
 
+        if path == "/api/ask":
+            return self._ask(json.loads(self._body() or b"{}"))
+        if path == "/api/ask/delete":
+            return self._json(200, {"threads": ask.delete(str(json.loads(self._body() or b"{}").get("thread") or ""))})
         if path in library_api.POST:
             return self._json(200, library_api.post(app, path, json.loads(self._body() or b"{}")))
         if path in jobs_api.POST:  # 一键停止翻译

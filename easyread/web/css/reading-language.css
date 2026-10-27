@@ -63,3 +63,24 @@ html[lang="en"] #settings.menu .slider { grid-template-columns: 6.6em minmax(0, 
   #settings .order-line > span { color: var(--ink-3); font-size: 12.5px; white-space: nowrap; }
   body.en-only #settings .view-row-narrow { display: none !important; }
 }
+
+/* 逐句对照（顶栏“逐句”）：有句子对齐的段落，原文一句、译文一句交替排。
+   .zh / .en 用 display: contents 让句子直接排进段落的 flex 列，顺序由 JS 写的 order 决定；
+   字体、字号、颜色仍从 .zh / .en 继承，所以译文在前、原文在前的样式和双语时一致。 */
+body.mode-sent #paper .sent-pairs { display: flex; flex-direction: column; }
+body.mode-sent #paper .sent-pairs > .zh,
+body.mode-sent #paper .sent-pairs > .en { display: contents; }
+body.mode-sent #paper .sent-pairs .snt { display: block; }
+body.mode-sent #paper .sent-pairs .snt-lead { margin-top: .5em; }
+body.mode-sent #paper .sent-pairs .snt[data-s="0"].snt-lead { margin-top: 0; }
+body.mode-sent #paper .sent-pairs .snt-follow { margin: .1em 0 .2em; padding-left: .8em; border-left: 2px solid var(--rule); }
+body.mode-sent #paper .sent-pairs .snt-lead:hover,
+body.mode-sent #paper .sent-pairs .snt-lead:hover + .snt-follow { background: none; }
+/* 句子以外的东西（过期提示、边注按钮、行内讨论）排在整段句子后面 */
+body.mode-sent #paper .sent-pairs > :not(.zh):not(.en),
+body.mode-sent #paper .sent-pairs .stale-tag { order: 100000; }
+/* 正在改这段译文：整段退回双语排法，编辑框在原位 */
+body.mode-sent #paper .sent-pairs:has(.editor-wrap) { display: block; }
+body.mode-sent #paper .sent-pairs:has(.editor-wrap) > .zh { display: block; }
+body.mode-sent #paper .sent-pairs:has(.editor-wrap) > .en { display: none; }
+.view-seg [data-view="sentence"] { margin-left: 2px; }

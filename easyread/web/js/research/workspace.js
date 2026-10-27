@@ -158,6 +158,7 @@
       PR.token = lib.token;
       const data = await PR.api(API);
       Object.assign(S, { items: normalizeItems(data.items), saved: data.saved || [], candidates: data.candidates || [], summaries: data.summaries || [], statuses: (data.statuses || []).filter((x) => x.id !== "paused"), categories: data.categories || [] });
+      loadJournalLists();
       if (S.tab === "path") {
         await loadLatestPath();
         const retryId = new URLSearchParams(location.search).get("retry_task");
@@ -257,7 +258,28 @@
     const selected = new Set(S.venueSelected.map((s) => s.id));
     const types = { conference: "會議", journal: "期刊", "book series": "書籍系列", repository: "典藏庫", "ebook platform": "電子書平台" }; // i18n-ok: 研究工作區依產品規格固定使用繁體中文。
     const choices = S.venueOptions.map((s) => '<label class="rw-source-option"><input type="checkbox" data-source-choice="' + escAttr(s.id) + '"' + (selected.has(s.id) ? " checked" : "") + '><span>' + esc(s.name) + '<small>' + esc((s.matched_queries || []).join(" / ")) + ' · ' + esc(PR.t(types[s.type] || s.type || "來源類型未提供")) + ' · ' + esc(PR.t("OpenAlex 收錄 {n} 篇", { n: s.works_count == null ? PR.t("未提供") : s.works_count.toLocaleString() })) + '</small></span></label>').join(""); // i18n-ok: 研究工作區依產品規格固定使用繁體中文。
-    return '<div class="rw-source-filter"><label for="rw-venue-query">出版來源</label><input id="rw-venue-query" value="' + escAttr(S.venueQuery) + '" placeholder="ICCV、ECCV、CVPR"><button type="button" class="btn sm line" data-action="search-sources"' + (S.venueBusy ? " disabled" : "") + '>' + PR.t(S.venueBusy ? "正在查找…" : "加入出版來源") + '</button><span class="rw-source">' + PR.t("已選 {n} 個來源", { n: S.venueSelected.length }) + '</span>' + (S.venueSelected.length ? btn("清除選取", "clear-source", "line") : "") + '</div>' + (choices ? '<div class="rw-source-options">' + choices + '</div>' : "") + (S.venueWarning ? '<div class="rw-stale">' + esc(S.venueWarning) + '</div>' : ""); // i18n-ok: 研究工作區依產品規格固定使用繁體中文。
+    return '<div class="rw-source-filter"><label for="rw-venue-query">出版來源</label><input id="rw-venue-query" value="' + escAttr(S.venueQuery) + '" placeholder="例如 Agricultural Systems、AMJ、CVPR"><button type="button" class="btn sm line" data-action="search-sources"' + (S.venueBusy ? " disabled" : "") + '>' + PR.t(S.venueBusy ? "正在查找…" : "加入出版來源") + '</button><span class="rw-source">' + PR.t("已選 {n} 個來源", { n: S.venueSelected.length }) + '</span>' + (S.venueSelected.length ? btn("清除選取", "clear-source", "line") : "") + '</div>' + renderJournalLists() + (choices ? '<div class="rw-source-options">' + choices + '</div>' : "") + (S.venueWarning ? '<div class="rw-stale">' + esc(S.venueWarning) + '</div>' : ""); // i18n-ok: 研究工作區依產品規格固定使用繁體中文。
+  }
+  /* 期刊清單：點一下把整串期刊名稱帶進「出版來源」並查找；可以把目前輸入的名稱存成自己的清單 */
+  function renderJournalLists() {
+    const lists = S.journalLists || { presets: [], custom: [] };
+    const chip = (list, kind, index) => '<span class="rw-journal-chip' + (kind === "custom" ? " custom" : "") + '"><button type="button" data-action="use-journal-list" data-kind="' + kind + '" data-index="' + index + '" title="' + escAttr(list.journals.join("; ")) + '">' + esc(list.name) + '<small>' + list.journals.length + '</small></button>' +
+      (kind === "custom" ? '<button type="button" class="rw-journal-del" data-action="delete-journal-list" data-index="' + index + '" aria-label="' + escAttr(PR.t("刪除這份期刊清單")) + '" title="' + escAttr(PR.t("刪除這份期刊清單")) + '">×</button>' : '') + '</span>';
+    const chips = lists.presets.map((x, i) => chip(x, "preset", i)).concat(lists.custom.map((x, i) => chip(x, "custom", i))).join("");
+    const save = S.journalSaveOpen
+      ? '<span class="rw-journal-save"><input id="rw-journal-name" value="" placeholder="' + escAttr(PR.t("清單名稱")) + '" maxlength="60"><button type="button" class="btn sm accent" data-action="save-journal-list">' + PR.t("儲存") + '</button><button type="button" class="btn sm line" data-action="cancel-journal-list">' + PR.t("取消") + '</button></span>'
+      : btn(PR.t("把目前輸入存成我的清單"), "open-journal-save", "line", (S.venueQuery || "").trim() ? "" : "disabled");
+    return '<div class="rw-journal-lists"><span class="rw-journal-label">' + PR.t("期刊清單") + '</span>' + chips + save + '</div>' +
+      '<div class="rw-source rw-journal-note">' + PR.t("清單只是常見期刊名稱，不代表 SSCI、ABS 等評等；正式評等請以發布機構的最新清單為準。") + '</div>';
+  }
+  async function loadJournalLists() {
+    try { S.journalLists = await PR.api(API + "/journal-lists"); } catch (_) { S.journalLists = { presets: [], custom: [] }; }
+    if (S.tab === "explore") renderExplore();
+  }
+  async function saveJournalLists(custom) {
+    try { S.journalLists = await PR.api(API + "/journal-lists", { method: "POST", body: { lists: custom } }); S.error = ""; }
+    catch (e) { S.error = e.message; }
+    renderExplore();
   }
   function alreadyInLibrary(w) {
     const saved = savedFor(w || {});
@@ -341,10 +363,13 @@
       (records.length ? '<div class="rw-results">' + records.map((record) => '<article class="rw-card rw-paper"><h3>' + titleHtml(record.paper.title || "未命名論文") + '</h3><div class="meta">' + esc([record.paper.authors, record.paper.year, record.paper.venue].filter(Boolean).join(" · ")) + '</div><span class="rw-chip">已整理摘要</span><div class="rw-source"><span>' + PR.t("整理模型：") + '</span>' + esc(record.summary_model || "未提供") + (record.updated ? ' · ' + esc(record.updated) : '') + '</div><div class="actions rw-candidate-actions">' + btn("查看摘要", "view-summary", "accent", 'data-key="' + escAttr(record.paper_key) + '"') + '<details class="rw-candidate-more"><summary class="btn sm line">' + PR.t("更多") + '</summary><div class="menu-list">' + btn("下載", "download-summary", "line", 'data-key="' + escAttr(record.paper_key) + '"') + btn("匯入 Obsidian", "export-summary-vault", "line", 'data-key="' + escAttr(record.paper_key) + '"') + btn("移到回收站", "trash-summary", "line", 'data-key="' + escAttr(record.paper_key) + '"') + '</div></details></div></article>').join("") + '</div>' : '<div class="rw-empty">' + PR.t("目前還沒有摘要。加入候選論文後會在背景自動整理摘要。") + '</div>'); /* i18n-dom: shared DOM translator localizes rendered UI text. */
   }
   const compareDimensionOptions = ["研究問題", "核心方法", "資料集", "評估指標", "實驗條件", "成本", "限制"]; // i18n-ok: 比較維度是送給後端的固定識別值。
+  // 實證社會科學（問卷、計量、結構方程）常用的比較維度；送給後端時，研究變數與量表會另外整理成對照表
+  const socialDimensionOptions = ["理論框架", "研究變數與構面", "測量量表與來源", "樣本與研究情境", "分析方法", "假設與檢定結果"]; // i18n-ok: 比較維度是送給後端的固定識別值。
   function renderComparisonSetup() {
     const selected = [...S.compareSelection].map((id) => S.items.find((item) => item.id === id)).filter(Boolean);
     const missing = selected.filter((item) => Number(item.parsed_blocks || 0) <= 0);
-    const dimensions = compareDimensionOptions.concat([...S.compareDimensions].filter((value) => !compareDimensionOptions.includes(value)));
+    const known = compareDimensionOptions.concat(socialDimensionOptions);
+    const dimensions = known.concat([...S.compareDimensions].filter((value) => !known.includes(value)));
     const papers = selected.length
       ? '<ul class="rw-compare-papers">' + selected.map((item) => '<li><b>' + titleHtml(item.title_zh || item.title_en || item.short_zh || item.id) + '</b><small>' + esc([item.year, item.venue].filter(Boolean).join(" · ")) + '</small></li>').join("") + '</ul>'
       : '<p class="rw-empty">' + PR.t("沒有找到選取的文獻，請返回文獻庫重新選擇。") + '</p>';
@@ -355,7 +380,8 @@
     return '<section class="rw-panel rw-compare-config"><div class="rw-section-head"><div><h3>' + PR.t("設定跨論文比較") + '</h3><p>' + PR.t("先選擇比較維度與分析焦點，確認後才會開始 AI 比較。") + '</p></div><button class="btn line" data-action="compare-cancel">' + PR.t("返回論文比較") + '</button></div>' +
       '<div class="rw-compare-select"><h3>' + PR.t("本次比較論文（{n} 篇）", { n: selected.length }) + '</h3>' + papers + '</div>' + warning +
       '<label class="rw-field"><span>' + PR.t("比較焦點（選填）") + '</span><input data-compare-focus value="' + escAttr(S.compareFocus) + '" placeholder="' + escAttr(PR.t("例如：各方法在資料效率上的差異")) + '"></label>' +
-      '<div><h3>' + PR.t("比較維度") + '</h3><div class="rw-compare-dimensions">' + checks + '</div></div>' +
+      '<div><h3>' + PR.t("比較維度") + '</h3><div class="rw-compare-dimensions">' + checks + '</div>' +
+      '<div class="rw-compare-presets"><span>' + PR.t("快速選擇：") + '</span><button type="button" class="btn sm line" data-action="compare-preset" data-preset="social">' + PR.t("實證社會科學（理論、變數、量表）") + '</button><button type="button" class="btn sm line" data-action="compare-preset" data-preset="method">' + PR.t("方法與實驗") + '</button></div></div>' +
       '<div class="rw-compare-custom"><input data-compare-custom value="' + escAttr(S.compareCustomDimension) + '" placeholder="' + escAttr(PR.t("新增自訂維度")) + '"><button class="btn sm line" data-action="compare-add-dimension">' + PR.t("加入") + '</button></div>' +
       '<div class="actions"><button class="btn accent" data-action="compare-start"' + (canStart ? "" : " disabled") + '>' + PR.t("開始比較") + '</button></div></section>';
   }
@@ -1307,7 +1333,33 @@
         case "toggle-interested-filter": S.filters.interested = !S.filters.interested; return renderBoard();
         case "retry-search": return search();
         case "retry-source": return searchSources();
+        case "compare-preset": {
+          S.compareDimensions = new Set(b.dataset.preset === "social" ? ["研究問題", ...socialDimensionOptions, "限制"] : ["研究問題", "核心方法", "資料集", "評估指標", "限制"]); // i18n-ok: 比較維度識別值。
+          return renderComparisons();
+        }
         case "search-sources": return searchSources();
+        case "use-journal-list": {
+          const lists = S.journalLists || { presets: [], custom: [] };
+          const list = (b.dataset.kind === "custom" ? lists.custom : lists.presets)[Number(b.dataset.index)];
+          if (!list) return;
+          const input = $("#rw-venue-query");
+          if (input) input.value = list.journals.join(", ");
+          return searchSources();
+        }
+        case "open-journal-save": rememberExploreInputs(); S.journalSaveOpen = true; renderExplore(); return $("#rw-journal-name")?.focus();
+        case "cancel-journal-list": S.journalSaveOpen = false; return renderExplore();
+        case "save-journal-list": {
+          rememberExploreInputs();
+          const name = ($("#rw-journal-name")?.value || "").trim();
+          if (!name) return $("#rw-journal-name")?.focus();
+          S.journalSaveOpen = false;
+          const custom = ((S.journalLists || {}).custom || []).filter((x) => x.name !== name);
+          return saveJournalLists(custom.concat([{ name, journals: S.venueQuery }]));
+        }
+        case "delete-journal-list": {
+          const custom = ((S.journalLists || {}).custom || []).filter((_, i) => i !== Number(b.dataset.index));
+          return saveJournalLists(custom);
+        }
         case "clear-source": rememberExploreInputs(); S.venueSelected = []; return renderExplore();
         case "queue": { const key = b.dataset.key; const work = S.results.find((w) => paperKey(w) === key) || S.candidates.find((c) => c.paper_key === key)?.paper || S.pathResults.find((step) => step.paper_key === key)?.paper; return queueModal(work); }
         case "candidate": {

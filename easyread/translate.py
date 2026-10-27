@@ -103,9 +103,7 @@ def _normalize(data: dict, pages: list[int], taken: set[str]) -> dict:
         b["id"] = bid
         if b["type"] == "figure":
             b.setdefault("src", "")
-            b["src"] = ""
-            for field in ("image_en", "image_zh", "box"):
-                b.pop(field, None)
+            normalize_figure(b)  # 截图要等合并锁里 id 最终去重之后，见 prepare_figures
         blocks.append(b)
     data["blocks"] = blocks
     return data
@@ -202,7 +200,7 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         data = _normalize(data, batch, _taken(ws, batch))  # 并发时别的批可能刚占用了同名 id
         missing = page_check.missing_pages(ws, batch, data)  # 有的页有内容、有的页整页漏了：漏的页不算译完
         keep = [n for n in batch if n not in missing]
-        # Figures remain placeholders; inspect the source PDF instead of cropping.
+        prepare_figures(ws.root, data["blocks"], total_pages)  # 按模型给的 box 截图，和译文一起显示
         _unify_terms(ws, data, batch)
         drop = _one_references(ws, data, batch)
         merge_blocks(ws, data, done=keep, replace_pages=keep, en_only=read, drop_ids=drop)

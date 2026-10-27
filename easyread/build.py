@@ -49,6 +49,9 @@ def build(ws: Workspace, out: Path | None = None, assets: Path | None = None, ex
     paper = ws.load("paper")
     images = {}
     done = set((paper.get("translation") or {}).get("done_pages") or []) if mobile else set()
+    # 还没截图的图、没重排出来的表，正文里直接放原页图：手机版也要带上这几页
+    done -= {b.get("page") for b in paper.get("blocks", [])
+             if (b.get("type") == "figure" and not b.get("src")) or (b.get("type") == "table" and not (b.get("head") or b.get("rows")))}
     rels = [p["img"] for p in paper.get("meta", {}).get("pages", []) if p.get("n") not in done] + [b["src"] for b in paper.get("blocks", []) if b.get("src")]
     for rel in rels:
         src = ws.root / rel

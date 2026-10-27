@@ -21,7 +21,7 @@
     root.style.setProperty("--measure", p.measure + "em");
     PR.applyTheme(p.theme);
     body.classList.toggle("font-sans", p.font === "sans");
-    body.classList.toggle("mode-bi", p.mode === "bi");
+    body.classList.toggle("mode-bi", p.mode === "bi" || p.mode === "sent");  // 逐句对照没对齐的段落照双语显示
     body.classList.toggle("no-margin", !p.margin);
     if (PR.applyReadingLanguage) PR.applyReadingLanguage();
     PR.ls.set("easyread-prefs", Object.assign(PR.migratePrefs(PR.ls.get("easyread-prefs", {})), p));

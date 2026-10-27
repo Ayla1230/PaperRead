@@ -4,7 +4,7 @@
   "use strict";
   PR.runAction = function (id) {
     const g = {
-      mode: () => PR.setPref("mode", PR.prefs.mode === "bi" ? "zh" : "bi"),
+      mode: () => PR.setPref("mode", ({ zh: "bi", bi: "sent", sent: "zh" })[PR.prefs.mode] || "zh"),  // B：单语 → 双语 → 逐句 → 单语
       toc: () => PR.toggleDrawer(null, "toc"),
       fontUp: () => PR.bumpFont(1), fontDown: () => PR.bumpFont(-1), fontReset: () => PR.resetType(),
       pages: () => PR.togglePages(), notes: () => PR.toggleNotesPanel(),

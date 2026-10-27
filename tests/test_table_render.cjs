@@ -55,17 +55,23 @@ function render(blocks) {
   return paperEl.innerHTML;
 }
 
-test("tables keep their caption and become clickable original-page placeholders", () => {
+test("translated tables render as a real table next to the text, with a link to the original page", () => {
   const html = render([
     { id: "tab1", type: "table", page: 1, head: ["Method", "Score"], rows: [["A", "0.8"]], caption_zh: "表 1：結果" },
     { id: "p1", type: "para", page: 1, zh: "AFTER_TABLE" },
   ]);
-  assert.match(html, /class="fig-placeholder table-placeholder" data-t="page"/);
-  assert.match(html, /表格保留於原文/);
-  assert.match(html, /表格位於原文第 1 頁（點擊查看）/);
+  assert.match(html, /<thead><tr><th[^>]*>Method<\/th><th[^>]*>Score<\/th><\/tr><\/thead>/);
+  assert.match(html, /<td[^>]*>0\.8<\/td>/);
+  assert.match(html, /class="tbl-orig link" data-t="page"/);
   assert.match(html, /表 1<\/span>：結果/);
-  assert.doesNotMatch(html, /<table class="tbl"|Method|Score|0\.8/);
+  assert.doesNotMatch(html, /fig-placeholder/);
   assert.match(html, /AFTER_TABLE/);
+});
+
+test("a table the model could not rebuild shows the original page image inline", () => {
+  const html = render([{ id: "tab2", type: "table", page: 1, head: [], rows: [], caption_zh: "表 2：缺" }]);
+  assert.match(html, /class="fig-page"><img data-t="page"[^>]*src="pages\/page-001\.webp"/);
+  assert.doesNotMatch(html, /<table class="tbl"/);
 });
 
 test("one malformed block does not blank the rest of the reader", () => {

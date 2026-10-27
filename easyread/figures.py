@@ -1,8 +1,11 @@
-"""圖塊處理：保留圖片在譯文中的版面佔位，讓讀者回到原 PDF 查看。
+"""图块截图。两条路：
 
-PaperRead 不偵測、翻譯或裁切圖內文字，也不把圖片截圖嵌入譯文。舊版
-資料中的裁切工具仍保留供相容性使用，但新的整理流程會清除模型提供的
-裁切框與圖片文字欄位。
+- 翻译 / 只读原文整理时，模型给了图本身的裁剪框 box：等块 id 在合并锁里最终去重之后，
+  prepare_figures 按 box 截图（normalize_figure 只整理字段，不截图）。
+- 模型没给框、或是旧论文：打开阅读页时 fill_later 按原页定位（layout.json）补截或更新自动截图。
+
+截图文件名带上页码、框和 PDF 文件身份的哈希（figures/crop-<页>-<哈希>.webp）：
+重译改了框就换新文件，不会沿用旧图或浏览器缓存，同 id 的块在别的页上也不会撞到同一张。
 """
 from __future__ import annotations
 
@@ -33,43 +36,120 @@ def figure_box(value) -> list[float] | None:
     return box
 
 
+def _source(root):
+    """裁图用的来源：复制进文献库的 source.pdf，或“连结既有 PDF”时记在 paper.json 里的原路径；
+    都没有时用匯入時已渲染好的原页图（pages/page-NNN.webp）。返回 (类型, 路径)。"""
+    pdf = root / "source.pdf"
+    if pdf.is_file():
+        return "pdf", pdf
+    try:
+        meta = (json.loads((root / "paper.json").read_text(encoding="utf-8")) or {}).get("meta") or {}
+    except (OSError, ValueError):
+        meta = {}
+    linked = meta.get("source_pdf_path")
+    if linked:
+        from pathlib import Path
+        path = Path(linked)
+        if path.is_absolute() and path.is_file():
+            return "pdf", path
+    return "image", None
+
+
+def _page_image(root, page: int):
+    path = root / "pages" / f"page-{page:03d}.webp"
+    return path if path.is_file() else None
+
+
 def _crop_path(root, page: int, box: list[float]) -> str:
-    source = (root / "source.pdf").stat()
+    kind, path = _source(root)
+    if kind == "image":
+        path = _page_image(root, page)
+        if path is None:
+            raise FileNotFoundError(f"no source for page {page}")
+    source = path.stat()
     identity = json.dumps([page, box, source.st_size, source.st_mtime_ns])
     name = f"crop-{page}-{hashlib.sha256(identity.encode()).hexdigest()[:20]}"
     return f"figures/{name}.webp"
 
 
+def _crop_image(root, page: int, box: list[float], rel: str) -> None:
+    from PIL import Image
+    with Image.open(_page_image(root, page)) as raw, raw.convert("RGB") as img:
+        W, H = img.size
+        x0, y0, x1, y1 = box
+        with img.crop((int(x0 * W), int(y0 * H), int(x1 * W), int(y1 * H))) as part:
+            (root / "figures").mkdir(exist_ok=True)
+            part.save(root / rel, "WEBP", quality=90)
+
+
 def crop(root, page: int, box: list[float]) -> str:
-    """按页码、框和 PDF 身份命名截图，已有同名文件就直接用。返回相对路径。"""
+    """按页码、框和来源身份命名截图，已有同名文件就直接用。返回相对路径。"""
     rel = _crop_path(root, page, box)
     if not (root / rel).is_file():
-        pdfwork.crop(root, page, box, rel.rsplit("/", 1)[1][:-5])
+        kind, path = _source(root)
+        if kind == "pdf":
+            pdfwork.crop(root, page, box, rel.rsplit("/", 1)[1][:-5], pdf=path)
+        else:
+            _crop_image(root, page, box, rel)
     return rel
 
 
 def normalize_figure(block: dict) -> None:
-    """只保留圖注與版面佔位，不保存圖內文字或裁切框。"""
-    block.pop("box", None)
-    block["src"] = ""
-    for key in ("image_en", "image_zh", "image_text_en", "image_text_zh"):
-        block.pop(key, None)
+    """整理模型给的图块字段：框无效就去掉，image_text_* 旧写法改成 image_*。不截图。"""
+    box = figure_box(block.get("box"))
+    if box:
+        block["box"] = box
+    else:
+        block.pop("box", None)
+    for lang in ("en", "zh"):
+        key = f"image_{lang}"
+        value = block.get(key) or block.pop(f"image_text_{lang}", "")
+        if value:
+            block[key] = str(value).strip()
 
 
 def prepare_figures(root, blocks: list[dict], total_pages: int) -> None:
-    """清理模型產生的圖片裁切資訊，保留原文圖片的版面佔位。"""
+    """在合并锁里、最后一次 id 去重之后调用：有 box 的图块重新截图。
+    截不了（页码不对、框无效、截图失败）就清掉 src 和 box，留给原页入口和 fill_later。没 box 的块不动。"""
     for block in blocks:
-        if block.get("type") != "figure":
+        if block.get("type") != "figure" or not block.get("box"):
             continue
         block["src"] = ""
-        block.pop("box", None)
-        for key in ("image_en", "image_zh", "image_text_en", "image_text_zh"):
-            block.pop(key, None)
+        page, box = block.get("page"), figure_box(block["box"])
+        if not box or not isinstance(page, int) or not 1 <= page <= total_pages:
+            block.pop("box", None)
+            continue
+        try:
+            block["src"] = crop(root, page, box)
+        except Exception:  # noqa: BLE001
+            block.pop("box", None)
+            log.exception("截图失败 %s 第 %s 页", block.get("id"), page)
 
 
 def _pending(ws):
-    """圖片只保留原文版面佔位，不建立背景截圖工作。"""
-    return []
+    """没有截图或自动裁剪范围已变化的图块；保留显式 box 和自定义 src。"""
+    layout = ws.load("layout") or {}
+    out = []
+    for b in (ws.load("paper") or {}).get("blocks", []):
+        src = b.get("src", "")
+        if b.get("type") != "figure" or src and (b.get("box") or not src.startswith("figures/crop-")):
+            continue
+        loc = layout.get(b.get("id")) or {}
+        box = figure_box(loc.get("box"))
+        page = loc.get("page")
+        if not box or not isinstance(page, int) or page < 1:
+            continue
+        x0, y0, x1, y1 = box
+        if x1 - x0 < 0.05 or y1 - y0 < 0.03:  # 只匹配到一行题注、没撑开的框截出来没用
+            continue
+        if src:
+            try:
+                if src == _crop_path(ws.root, page, box) and (ws.root / src).is_file():
+                    continue
+            except OSError:
+                continue  # PDF 不在时保留已经存在的截图。
+        out.append((b, page, box))
+    return out
 
 
 def missing(ws) -> list[tuple[str, int, list[float]]]:
