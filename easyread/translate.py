@@ -206,7 +206,7 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         merge_blocks(ws, data, done=keep, replace_pages=keep, en_only=read, drop_ids=drop)
         _save_checks(ws, data.get("checks"), batch)
         try:
-            pdfwork.locate(ws.root)
+            pdfwork.locate(ws.root, detail=False)  # 每批只重算段落框；逐句逐字等最后算一次
         except Exception:  # noqa: BLE001 —— 定位失败不影响阅读
             log.exception("locate 失败 %s", ws.id)
     if missing:
@@ -404,6 +404,12 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
         except Exception as e:  # noqa: BLE001
             journal(ws, tr("术语一致性检查没做成：{err}", err=str(e)[:300]))
             log.warning("术语一致性检查失败 %s: %s", ws.id, e)
+    if state["ok"]:
+        try:  # 整篇译完：补算原页上逐句、逐字的位置（阅读页“PDF”对照用）
+            with _merge_lock:
+                pdfwork.locate(ws.root)
+        except Exception:  # noqa: BLE001 —— 定位失败不影响阅读
+            log.exception("locate 失败 %s", ws.id)
     journal(ws, tr("结束，{n} 页失败：{pages}", n=len(failed), pages=sorted(failed)) if failed else tr("结束，全部成功"))
     return failed
 

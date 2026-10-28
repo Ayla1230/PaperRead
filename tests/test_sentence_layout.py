@@ -78,6 +78,22 @@ class SentenceLayoutTest(unittest.TestCase):
         plain = [w for w in words if w[1] - w[0] == 3]
         self.assertTrue(plain)
 
+    def test_quick_layout_during_translation_is_completed_when_the_reader_opens(self):
+        parts_en = ["Attitude had the strongest effect on intention. ", "Subjective norm had a weaker effect."]
+        parts_zh = ["態度的影響最強。", "主觀規範的影響較弱。"]
+        en, zh = "".join(parts_en), "".join(parts_zh)
+        self.page(1, en)
+        write_json_atomic(self.root / "paper.json", {"blocks": [
+            {"id": "p1-1", "page": 1, "type": "para", "en": en, "zh": zh, "sents": sents(en, zh, parts_en, parts_zh)}]})
+        quick = pdfwork.locate(self.root, detail=False)["p1-1"]  # 翻译时每批这样算：快，只有段落框
+        self.assertNotIn("snts", quick)
+        self.assertNotIn("words", quick)
+        pdfwork.refresh_layout(self.root)                          # 打开阅读页时补齐
+        import json
+        full = json.loads((self.root / "layout.json").read_text(encoding="utf-8"))["p1-1"]
+        self.assertIn("snts", full)
+        self.assertIn("words", full)
+
     def test_unmatched_text_block_gets_no_guessed_box(self):
         self.page(1, "Completely different words appear on this page of the document. " * 2)
         write_json_atomic(self.root / "paper.json", {"blocks": [

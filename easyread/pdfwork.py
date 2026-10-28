@@ -187,8 +187,11 @@ def _line_boxes(chars, idx, a: int, b: int) -> list[list[float]]:
         height = (box[3] - box[1]) or 0.01
         same_line = last and abs((last[1] + last[3]) / 2 - (box[1] + box[3]) / 2) < height * 0.6 \
             and box[0] >= last[0] - 0.01 and box[0] - last[2] < 0.03
-        if same_line:
-            rows[-1] = _bounds([last, box])
+        if same_line:  # 就地放大（这里每个字都会走一次，别为它建新的 list）
+            if box[0] < last[0]: last[0] = box[0]
+            if box[1] < last[1]: last[1] = box[1]
+            if box[2] > last[2]: last[2] = box[2]
+            if box[3] > last[3]: last[3] = box[3]
         else:
             rows.append(list(box))
     return [[round(v, 4) for v in r] for r in rows]
@@ -241,22 +244,40 @@ def _sentence_boxes(text: str, idx, chars, a: int, end: int, en: str, sents) -> 
 _WORD = re.compile(r"\S+")
 
 
+def _align(plain: str, seg: str, offset: int) -> list[int]:
+    """原文（只留英数字）每个字对到原页文字里的位置，对不上的是 -1。
+    两边几乎一样（只差公式、页眉、连字号），所以逐字往前走；一对不上就用接下来 8 个字在附近重新找回位置。
+    比 difflib 快很多（翻译时每批都要重算整篇）。"""
+    out = [-1] * len(plain)
+    i = j = 0
+    n, m = len(plain), len(seg)
+    while i < n and j < m:
+        if plain[i] == seg[j]:
+            out[i] = offset + j
+            i += 1
+            j += 1
+            continue
+        probe = plain[i:i + 8]
+        hit = seg.find(probe, j, j + 160) if len(probe) == 8 else -1
+        if hit >= 0:
+            j = hit  # 原页多出来的字（页眉、公式符号）：跳过
+            continue
+        i += 1  # 原文多出来的字（公式、上一页那截）：这个字不框
+    return out
+
+
 def _word_boxes(text: str, idx, chars, a: int, end: int, en: str) -> list:
     """英文原文每个词在原页上的框：[[词开头, 词结尾, x0, y0, x1, y1], …]。
     词的位置用“去掉公式后只留英数字”的累计位置表示（页面上用同样的算法从滑鼠位置换算），
     原页这一段文字和原文逐字对齐（difflib），对不上的字（公式、页眉、上一页的那截）就跳过。
     一个词断在两行（连字号）时有两个框，开头结尾相同。"""
-    from difflib import SequenceMatcher
     plain_tokens = [(_norm(m.group(0))) for m in _WORD.finditer(_MATH.sub(" ", en))]
     plain = "".join(plain_tokens)
     seg_end = min(len(text), end + 1 + 40)
     seg = text[a:seg_end]
     if not plain or not seg:
         return []
-    page_of = [-1] * len(plain)
-    for block in SequenceMatcher(None, plain, seg, autojunk=False).get_matching_blocks():
-        for k in range(block.size):
-            page_of[block.a + k] = a + block.b + k
+    page_of = _align(plain, seg, a)
     out, pos = [], 0
     for tok in plain_tokens:
         ns, ne = pos, pos + len(tok)
@@ -355,12 +376,13 @@ def block_english(block: dict) -> str:
     return block.get("en", "")
 
 
-def locate(root: Path) -> dict:
+def locate(root: Path, detail: bool = True) -> dict:
+    """detail=False：只算段落框（翻译时每批都要重算整篇，求快）；逐句、逐字的框等整篇译完或打开阅读页时再补。"""
     with _LAYOUT_LOCK:
-        return _locate(root)
+        return _locate(root, detail)
 
 
-def _locate(root: Path) -> dict:
+def _locate(root: Path, detail: bool = True) -> dict:
     paper = json.loads((root / "paper.json").read_text(encoding="utf-8"))
     extract_dir = root / "extract"
     # Blocks may arrive out of page order during parallel translation. Keep only
@@ -423,19 +445,21 @@ def _locate(root: Path) -> dict:
                 layout[bid]["boxes"] = boxes
             if block.get("type") in ("figure", "table"):
                 layout[bid]["cap"] = _bounds(boxes)  # 题注本身的位置；图的区域之后会往外扩，裁图时要把题注切掉
-            snts = _snts(block, text, idx, chars, a, end)
-            if snts:
-                layout[bid]["snts"] = snts
-            words = _words(block, text, idx, chars, a, end)
-            if words:
-                layout[bid]["words"] = words
+            if detail:
+                snts = _snts(block, text, idx, chars, a, end)
+                if snts:
+                    layout[bid]["snts"] = snts
+                words = _words(block, text, idx, chars, a, end)
+                if words:
+                    layout[bid]["words"] = words
             cursor[pn] = end
             break
     _extend_captioned(paper.get("blocks", []), layout, root)
     _clamp_overlaps(layout)
     _fill_gaps(paper.get("blocks", []), layout)
     write_json_atomic(root / "layout.json", layout)
-    (extract_dir / "locate.version").write_text(LOCATE_VERSION, encoding="utf-8")
+    # 只算了段落框时记成 “版本-lite”，打开阅读页（refresh_layout）看到版本不同就会补算逐句、逐字
+    (extract_dir / "locate.version").write_text(LOCATE_VERSION if detail else LOCATE_VERSION + "-lite", encoding="utf-8")
     return layout
 
 
