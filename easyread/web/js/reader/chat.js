@@ -318,7 +318,7 @@
     }
     const card = b.closest(".cm.ai");
     const m = card && thread() && thread().messages.find((x) => x.id === card.dataset.id);
-    if (c === "copy" && m) navigator.clipboard.writeText(m.content).then(() => PR.toast(PR.t("已复制")));
+    if (c === "copy" && m) (PR.copyForWord ? PR.copyForWord(m.content, true) : navigator.clipboard.writeText(m.content)).then(() => PR.toast(PR.t("已复制")));
     if (c === "pin" && m) {
       try {
         await PR.api("/api/p/" + PR.pid + "/chat/pin", { method: "POST", body: { thread: st.cur, id: m.id } });

@@ -200,7 +200,7 @@
     return '<header class="paper-head" id="b-head" data-id="head">' + (kicker ? '<div class="kicker">' + kicker + "</div>" : "") +
       "<h1>" + (PR.titleHtml ? PR.titleHtml(m.title_zh || m.title_en || PR.t("（正在识别标题）")) : PR.esc(m.title_zh || m.title_en || PR.t("（正在识别标题）"))) + "</h1>" +
       (m.title_zh && m.title_en && m.title_zh !== m.title_en ? '<p class="title-en" lang="' + (m.target === "en" ? "" : "en") + '">' + (PR.titleHtml ? PR.titleHtml(m.title_en) : PR.esc(m.title_en)) + "</p>" : "") +
-      (by ? '<p class="byline">' + by + "</p>" : "") + '<p class="scope">' + scope + "</p>" + creditHtml() + "</header>";
+      (by ? '<p class="byline">' + by + "</p>" : "") + '<p class="scope">' + scope + "</p>" + creditHtml() + (PR.store.mode === "static" && !S.demo && PR.exportNotice ? '<p class="export-notice">' + PR.esc(PR.exportNotice()) + "</p>" : "") + "</header>";
   }
 
   /* 还没译的页：放原页图，边译边读 */

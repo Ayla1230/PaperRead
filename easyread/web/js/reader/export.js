@@ -128,7 +128,7 @@
     const analysisId = "paper:" + paperId + ":analysis", mindmapId = "paper:" + paperId + ":mindmap", annotationsId = "paper:" + paperId + ":annotations";
     const bibliography = ["## 書目資料", "", m.title_en ? "- English title: " + m.title_en : "", m.authors ? "- " + PR.t("作者") + "：" + m.authors : "", m.date ? "- " + PR.t("年份") + "：" + m.date : "", m.doi ? "- DOI: " + m.doi : "", m.url ? "- URL: " + m.url : ""].filter(Boolean).join("\n"); // i18n-ok: exported Markdown content headings are data, not interface copy.
     const note = (S.reader.paper_note || {}).body;
-    const analysis = [bibliography, pick.paper && note ? "## " + PR.t("論文筆記") + "\n\n" + note : "", prepared.warning].filter(Boolean).join("\n\n");
+    const analysis = [bibliography, pick.paper && note ? "## " + PR.t("論文筆記") + "\n\n" + note : "", prepared.warning, PR.exportNotice ? "> " + PR.exportNotice() : ""].filter(Boolean).join("\n\n");
     const annotations = PR.notesMarkdown({ paper: false, note: !!pick.note, highlight: !!pick.highlight, question: !!pick.question, ai: !!pick.ai, chat: !!pick.chat, quote: !!pick.quote }, chat, { order, chat, mindmap: "" });
     const result = [];
     const stem = filenameStem();
@@ -141,7 +141,7 @@
         paper_id: paperId,
         title: title() + " - " + PR.t("心智圖"),
         filename: stem + "-mind-map",
-        body: "## " + PR.t("論文心智圖") + "\n\n![[" + imgName + "]]",
+        body: "## " + PR.t("論文心智圖") + "\n\n![[" + imgName + "]]" + (PR.exportNotice ? "\n\n> " + PR.exportNotice() : ""),
         links: [analysisId],
       };
       if (prepared.mindmapPngBase64) {

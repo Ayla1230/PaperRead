@@ -389,6 +389,7 @@ body.dual-margin.no-margin #margin-left, body.dual-margin.no-margin #margin { di
 @media (max-width: 760px) { .demo-pill span { display: none; } }
 .demo-credit { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 0; line-height: 1.7; }
 .demo-credit a { color: var(--ink-2); }
+.export-notice { font-size: 12.5px; color: var(--ink-2); margin: 10px 0 0; padding: 6px 10px; line-height: 1.7; border-left: 3px solid var(--line, #ccc); background: var(--paper-2, rgba(0,0,0,.03)); }
 
 /* 页内搜索 */
 .reader-nav { position: fixed; top: calc(var(--bar-h) + 10px); right: 16px; z-index: 65; background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 8px 30px #0002; padding: 10px; font: 13px var(--ui); max-width: calc(100vw - 24px); }

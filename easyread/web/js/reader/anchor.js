@@ -299,6 +299,7 @@
 
   // 原生复制包含 KaTeX 的逐字排版层与隐藏 MathML，粘贴到富文本编辑器会变成一字一行且重复两次（#65）
   document.addEventListener("copy", (e) => {
+    if (PR.rangeForWord) return;  // copy-math.js 已接手：HTML 带上下标、纯文字用 Unicode 上下标
     if (!e.clipboardData || (e.target.closest && e.target.closest("input, textarea, [contenteditable]"))) return;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) return;
@@ -345,11 +346,16 @@
   PR.selectionAction = function (kind, color) {
     if (!pendingSel) return;
     const { anchor, key, quote, prefix, suffix, side, parts, target } = pendingSel;
+    const live = getSelection();
+    const range = live && live.rangeCount && !live.isCollapsed ? live.getRangeAt(0).cloneRange() : null;
     selbar().classList.remove("open");
     getSelection().removeAllRanges();
     pendingSel = null;
     if (kind === "en") { PR.toggleEn(anchor, true); return; }
-    if (kind === "copy") { navigator.clipboard.writeText(quote).then(() => PR.toast(PR.t("已复制"))); return; }
+    if (kind === "copy") {  // 公式转成 Word 看得懂的上下标，不贴 LaTeX 原始码（copy-math.js）
+      (range && PR.copyRangeForWord ? PR.copyRangeForWord(range) : navigator.clipboard.writeText(quote)).then(() => PR.toast(PR.t("已复制")));
+      return;
+    }
     if (kind === "chat") { PR.chatAsk({ anchor, quote }); return; }
     const pen = PR.prefs.pen === "underline" ? "underline" : "marker";
     color = color || (PR.prefs.penColors || {})[pen] || "yellow";

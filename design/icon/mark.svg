@@ -1,15 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <g transform="translate(512 512) scale(1.12) translate(-470 -560)" fill="#111" stroke="#111">
-    <ellipse cx="450" cy="660" rx="185" ry="200"/>
-    <ellipse cx="410" cy="772" rx="188" ry="112"/>
-    <ellipse cx="562" cy="568" rx="122" ry="172" transform="rotate(-12 562 568)"/>
-    <circle cx="602" cy="404" r="128"/>
-    <ellipse cx="716" cy="436" rx="42" ry="33"/>
-    <path d="M524 336 L 538 222 L 604 300 Z" stroke-linejoin="round" stroke-width="26"/>
-    <path d="M602 292 L 652 200 L 690 316 Z" stroke-linejoin="round" stroke-width="26"/>
-    <rect x="572" y="590" width="94" height="285" rx="44"/>
-    <ellipse cx="652" cy="858" rx="58" ry="26"/>
-    <path d="M300 826 C 186 866, 236 916, 362 906 L 566 906" fill="none" stroke-width="54" stroke-linecap="round"/>
-
+  <!-- 頁面上用的黑色標誌（暗色模式由 CSS 反白） -->
+  <g fill="#111" color="#111" transform="translate(512 512) scale(1.02) translate(-565 -550)">
+    <path d="M772 300 C772 320 756 334 734 340 C716 346 706 356 702 372 C696 404 702 436 714 472 C730 522 728 582 714 642 C706 702 712 792 716 852 C720 872 746 876 766 880 C788 884 788 914 762 916 L430 920 C344 918 294 868 294 788 C294 680 350 590 430 520 C496 462 548 428 560 380 C568 350 556 318 560 286 C562 262 570 240 578 222 L578 158 C600 176 620 192 636 204 C656 196 676 184 698 160 C700 190 704 218 716 240 C744 254 772 274 772 300 Z"/>
+<path d="M330 840 C300 920 420 936 560 930 C690 926 780 914 836 868" fill="none" stroke="currentColor" stroke-width="44" stroke-linecap="round"/>
   </g>
 </svg>

@@ -416,7 +416,8 @@
           for (const c of exportOptions.chat) out.push(c.role === "user" ? PR.t("**我**：") + c.content : PR.t("**AI**（{model}）：", { model: c.model || "" }) + c.content, "");
         } else if (kind === "mindmap" && pick.mindmap && exportOptions.mindmap) { const fence = String.fromCharCode(96).repeat(3); out.push("## " + PR.t("論文心智圖"), "", fence + "mermaid", exportOptions.mindmap, fence, ""); }
       }
-      return out.join("\n");
+      if (PR.exportNotice) out.push("", "---", "", "> " + PR.exportNotice());
+    return out.join("\n");
     }
     const pn = (S.reader.paper_note || {}).body;
     if (pick.paper && pn) out.push("## " + PR.t("论文笔记"), "", pn, "");
@@ -436,6 +437,7 @@
       out.push("", "## " + PR.t("问 AI 的对话"), "");
       for (const c of chat) out.push(c.role === "user" ? PR.t("**我**：") + c.content : PR.t("**AI**（{model}）：", { model: c.model || "" }) + c.content, "");
     }
+    if (PR.exportNotice) out.push("", "---", "", "> " + PR.exportNotice());
     return out.join("\n");
   };
 })(window.PR);
