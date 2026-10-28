@@ -127,6 +127,8 @@
         // 多张小图（a、b…）：按小图分组，每组前面一行“图 3(a)”，同一页好几张小图也分得清
         const row = (x) => "<tr><th>" + PR.esc(PR.FIG_ROLE[x.role] || PR.FIG_ROLE.label) + '</th><td class="fl-zh">' + PR.md(x.zh || "", { cite: false, xref: false }) +
           '</td><td class="fl-en" lang="en">' + PR.md(x.en || "", { cite: false, xref: false }) + "</td></tr>";
+        // 小图名称：图上印的 (a)(b) → “图 1(a)”；没印编号、按位置编的 1、2 → “图 1・第 1 张”
+        const panelName = (p) => /^\d+$/.test(p) ? (b.num ? PR.t("图 {n}・第 {p} 张", { n: b.num, p }) : PR.t("第 {p} 张", { p })) : b.num ? PR.t("图 {n}({p})", { n: b.num, p }) : "(" + p + ")";
         const groups = [];
         for (const x of labels) {
           const key = x.panel || "";
@@ -135,7 +137,7 @@
           g.rows.push(x);
         }
         groups.sort((a, b) => (a.key ? 1 : 0) - (b.key ? 1 : 0));  // 没编号的（整张图共用的）放最前面
-        const head = (key) => key ? '<tr class="fl-panel"><th colspan="3"><span>' + PR.esc(b.num ? PR.t("图 {n}({p})", { n: b.num, p: key }) : "(" + key + ")") + "</span></th></tr>" : "";
+        const head = (key) => key ? '<tr class="fl-panel"><th colspan="3"><span>' + PR.esc(panelName(key)) + "</span></th></tr>" : "";
         // 小图有位置（例如 3×3 九宫格）：对照表照原图的列、栏摆成同样的格子；窄屏幕时 CSS 改回一栏
         const pos = {};
         (Array.isArray(b.image_panels) ? b.image_panels : []).forEach((x) => { if (x && x.panel) pos[x.panel] = x; });
@@ -147,7 +149,7 @@
           const item = (x) => '<li><span class="fl-role">' + PR.esc(PR.FIG_ROLE[x.role] || PR.FIG_ROLE.label) + '</span><span class="fl-zh">' + PR.md(x.zh || "", { cite: false, xref: false }) +
             '</span>' + (x.en && x.en !== x.zh ? '<span class="fl-en" lang="en">' + PR.md(x.en, { cite: false, xref: false }) + "</span>" : "") + "</li>";
           const cell = (g) => '<div class="fl-cell" style="--r:' + pos[g.key].row + ";--c:" + pos[g.key].col + '"><div class="fl-chip"><span>' +
-            PR.esc(b.num ? PR.t("图 {n}({p})", { n: b.num, p: g.key }) : "(" + g.key + ")") + "</span></div><ul>" + g.rows.map(item).join("") + "</ul></div>";
+            PR.esc(panelName(g.key)) + "</span></div><ul>" + g.rows.map(item).join("") + "</ul></div>";
           body = (shared.length ? "<table>" + shared.map((g) => head(g.key) + g.rows.map(row).join("")).join("") + "</table>" : "") +
             '<div class="fl-grid" style="--cols:' + cols + '">' + placed.map(cell).join("") + "</div>";
         } else {

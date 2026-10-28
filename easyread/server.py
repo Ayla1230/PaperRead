@@ -532,6 +532,12 @@ class Handler(BaseHTTPRequestHandler):
                 labels = figure_text.extract(ws, str(body.get("block") or ""), config.load())
                 block = next((b for b in (ws.load("paper") or {}).get("blocks", []) if b.get("id") == body.get("block")), None)
                 return self._json(200, {"labels": labels, "block": block})
+            if action == "variables":  # 研究变数：请模型列出自变数、依变数、中介、调节、控制变数（variables.py）
+                from . import variables
+                if body.get("clear"):
+                    ws.update("paper", lambda p: (p.pop("variables", None), p)[1])
+                    return self._json(200, {"variables": None})
+                return self._json(200, {"variables": variables.extract(ws, config.load())})
             if action == "discussion_del":
                 return self._json(200, {"deleted": paperdata.delete_discussion(ws, str(body.get("id", "")))})
             if action == "smart-annotate":
