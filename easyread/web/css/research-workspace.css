@@ -213,7 +213,7 @@
 .rw-summary .md-h { margin:.8em 0 .3em; font-size:1.12em; font-weight:650; }
 .rw-summary .tbl-wrap { max-width:100%; margin:.7em 0; overflow-x:auto; }
 .rw-summary table.tbl { width:100%; border-collapse:collapse; font:12.5px/1.6 var(--ui); }
-.rw-summary td,.rw-summary th { padding:6px 8px; border-bottom:1px solid var(--rule); vertical-align:top; white-space:normal; }
+.rw-summary td,.rw-summary th { padding:6px 8px; border-bottom:1px solid var(--rule); text-align:left; vertical-align:middle; white-space:normal; }
 .rw-summary th { color:var(--ink); background:var(--surface-2); text-align:left; }
 .rw-summary pre { max-width:100%; overflow:auto; padding:10px; border-radius:8px; background:var(--surface-2); color:var(--ink); font:11.5px/1.5 var(--mono); }
 .rw-publication-data { display:grid; grid-template-columns:minmax(100px,.45fr) 1fr; gap:7px 12px; margin:0; font-size:12px; }

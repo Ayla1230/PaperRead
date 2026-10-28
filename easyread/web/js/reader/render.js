@@ -105,8 +105,7 @@
       if (!head0.length && !rows0.length) {
         table = '<div class="figure-media">' + pageImageHtml(b, PR.t("表格见原文第 {n} 页（点击放大）", { n: b.page })) + "</div>";
       } else {
-        const al = (b.align || "").split("");
-        const style = (i) => (al[i] ? ' style="text-align:' + ({ l: "left", r: "right", c: "center" }[al[i]] || "left") + '"' : "");
+        const style = () => "";  // 表格一律靠左、垂直置中（reader.css），不照模型给的 align
         const head = head0.map((r) => "<tr>" + r.map((c, i) => "<th" + style(i) + ">" + cell(c) + "</th>").join("") + "</tr>").join("");
         const rows = rows0.map((r) => "<tr>" + r.map((c, i) => "<td" + style(i) + ">" + cell(c) + "</td>").join("") + "</tr>").join("");
         table = '<div class="tbl-wrap"><table class="tbl"><thead>' + head + "</thead><tbody>" + rows + "</tbody></table></div>" +
