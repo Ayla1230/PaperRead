@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 AUTO_MAX = 4      # “自动”最多同时几段（手动最多 8 段）
+MAX_LANES = 8     # 手动、或翻译速度选“快速”时最多同时几段
 LANE_BATCHES = 2  # “自动”时每段大约几批：段数 = 总批数 / 2 向上取整（每批 2 页时每段 4 页），最多 AUTO_MAX
 
 _NOISE = re.compile(r"^\s*(\d{1,4}|[ivxl]{1,5}|(?i:page \d+.*|arxiv:.*))\s*$")  # i18n-ok 页码、arXiv 水印这类
@@ -24,7 +25,7 @@ def workers(setting, n_batches: int) -> int:
     except (TypeError, ValueError):
         cap = 0
     if cap > 0:
-        return min(8, cap)
+        return min(MAX_LANES, cap)
     return max(1, min(AUTO_MAX, math.ceil(n_batches / LANE_BATCHES)))
 
 

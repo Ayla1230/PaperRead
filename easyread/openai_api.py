@@ -90,7 +90,7 @@ def _body(o: dict, prompt: str, images: list[Path], stream: bool, temperature: f
 
 
 def _open(o: dict, body: dict, stream: bool):
-    """发请求。有的模型（推理模型、Kimi K2 系列）不让改 temperature、有的接口不认 stream_options，报 400 时去掉再发。"""
+    """发请求。有的模型（推理模型、Kimi K2 系列）不让改 temperature、有的接口不认 stream_options、reasoning_effort，报 400 时去掉再发。"""
     path = "/responses" if kind(o) == "responses" else "/chat/completions"
     for _ in range(3):
         req = urllib.request.Request(_base(o) + path, data=json.dumps(body).encode(), headers=_headers(o, stream))
@@ -100,7 +100,7 @@ def _open(o: dict, body: dict, stream: bool):
             full = e.read(4000).decode("utf-8", "replace")  # Gemini 说明“每日额度用完”的 quotaId 在比较后面
             detail = full[:300]
             e.close()
-            drop = next((k for k in ("temperature", "stream_options") if k in detail and k in body), None)
+            drop = next((k for k in ("temperature", "stream_options", "reasoning_effort") if k in detail and k in body), None)
             if e.code == 400 and drop:
                 body = {k: v for k, v in body.items() if k != drop}
                 continue

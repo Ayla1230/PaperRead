@@ -2174,5 +2174,13 @@
   "用你自己的 API Key 调用模型的次数和 token，由 PaperRead 在这台电脑上记录。": "Calls and tokens used with your own API key, recorded by PaperRead on this computer.",
   "还没有用 API 调用过模型。翻译或问 AI 之后，这里会显示今天用了多少、什么时候重置。": "No API calls yet. After you translate or ask AI, this shows how much you used today and when it resets.",
   "今天 {time}": "today {time}",
-  "明天 {time}": "tomorrow {time}"
+  "明天 {time}": "tomorrow {time}",
+  "下一次翻译开始生效": "Applies from the next translation",
+  "全部批次同时送出（最多 8 段），通常快 1.5～2 倍。调用次数不变，输入 token 约多 5%～10%；免费额度有每分钟上限，超过时会自动等一下再送。": "Sends all batches at once (up to 8 sections), usually 1.5–2× faster. Same number of calls, about 5–10% more input tokens; free tiers have per-minute limits, so requests over the limit wait briefly and retry.",
+  "已改成「{name}」，下一次翻译开始生效": "Switched to \"{name}\"; applies from the next translation",
+  "快速": "Fast",
+  "快速再加上让模型少思考（API 的推理强度设为 low）。思考也算输出 token，所以通常更快、用量反而更少；复杂公式和表格偶尔可能没那么准。": "Fast, plus less model thinking (API reasoning effort set to low). Thinking counts as output tokens, so this is usually faster and uses less; complex formulas and tables may occasionally be less accurate.",
+  "最多同时译 4 段，最省额度。": "Up to 4 sections at once; uses the least quota.",
+  "最快": "Fastest",
+  "翻译速度": "Translation speed"
 }

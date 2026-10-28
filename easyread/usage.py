@@ -242,4 +242,4 @@ def summary(now: float | None = None) -> dict:
         out.append({"id": pid, "name": entry.get("name") or pid, "tz": tz, "free": bool(entry.get("free")), "usage_url": entry.get("usage_url") or "",
                     "day": day, "reset_at": int(reset), "models": rows})
     out.sort(key=lambda p: -sum(r["calls"] for r in p["models"]))
-    return {"providers": out, "claude": latest(), "now": int(now)}
+    return {"providers": out, "claude": latest(), "now": int(now), "speed": config.load().get("speed") or "standard"}

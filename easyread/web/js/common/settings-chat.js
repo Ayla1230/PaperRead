@@ -155,6 +155,9 @@
     if (m) h += '<p class="hint">' + PR.t("推理强度") + ': ' + PR.esc(m.reasoning_effort || PR.modelDefaultLabel(s, { kind: kindOf(m), model: m.model }, "reasoning_effort")) +
       ((e === "claude" || e === "antigravity") ? "" : ' · Fast: ' + PR.esc(m.service_tier || PR.modelDefaultLabel(s, { kind: kindOf(m), model: m.model }, "service_tier"))) + '</p>';
     if (e === "openai") h += '<label class="check" style="margin:0 0 10px"><input type="checkbox" data-k="openai.vision"' + (c.openai.vision ? " checked" : "") + ">" + PR.t("模型能看图") + "</label>";
+    const speeds = PR.SPEEDS || [], sp = speeds.find((x) => x[0] === (c.speed || "standard")) || speeds[0];
+    if (sp) h += '<label class="field"><span>' + PR.t("翻译速度") + '</span><select class="input" data-k="speed">' + PR.opt(speeds.map((x) => [x[0], x[1]]), sp[0]) + "</select></label>" +
+      '<p class="hint speed-hint">' + sp[2] + "</p>";
     h += '<div class="grid2 translation-limits">' +
       '<label class="field"><span>' + PR.t("每批页数") + '</span><select class="input" data-k="batch_pages">' + PR.opt([[1, PR.t("1 页")], [2, PR.t("2 页")], [3, PR.t("3 页")], [4, PR.t("4 页")]], c.batch_pages) + "</select></label>" +
       '<label class="field" title="' + PR.t("把全文切成几段同时译，段内按顺序译；自动按篇幅每段约 2 批、最多 4 段；手动最多 8 段") + '"><span>' + PR.t("同时译几段") + '</span><select class="input" data-k="concurrency">' + PR.opt([[0, PR.t("自动")], [1, "1"], [2, "2"], [3, "3"], [4, "4"], [5, "5"], [6, "6"], [7, "7"], [8, "8"]], c.concurrency || 0) + "</select></label>" +
@@ -209,6 +212,7 @@
     },
     sync(s) { readForm(s); readTranslation(s); },
     change(e, s) {
+      if (e.target.dataset.k === "speed") { const h = PR.$(".speed-hint", root()), sp = (PR.SPEEDS || []).find((x) => x[0] === e.target.value); if (h && sp) h.textContent = sp[2]; }
       if (e.target.dataset.k) { readTranslation(s); PR.saveModelSettings(); return false; }
       if (e.target.dataset.reasoning) { readForm(s); autoSaveForm(s); return true; }
       if (s.form && isApi(s.form.kind)) {

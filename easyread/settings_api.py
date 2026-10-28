@@ -9,6 +9,8 @@ def save_config(patch: dict) -> dict:
     patch.pop("library_dir", None)
     if "page_cap" in patch and (type(patch["page_cap"]) is not int or patch["page_cap"] < 0):
         raise ValueError(tr("页数确认上限必须是非负整数"))
+    if "speed" in patch and patch["speed"] not in ("standard", "fast", "fastest"):
+        patch["speed"] = "standard"
     if "target" in patch:
         patch["target"] = langs.valid(patch["target"])
     if isinstance(patch.get("openai"), dict):

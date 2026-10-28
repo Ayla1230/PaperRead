@@ -4,6 +4,8 @@
 - 旧论文、或图内文字没整理到的：阅读页按“辨识图内文字”，用翻译引擎看裁好的图，补上 image_labels。
 存进 paper.json 的图块：image_labels = [{"panel": "a", "role": "title|x|y|legend|label", "en": "…", "zh": "…"}]，
 panel 是多张小图时图上印的编号（a、b、g…），单张图留空；阅读页按小图分组显示，
+image_panels = [{"panel": "a", "row": 1, "col": 1}, …] 是每张小图在整张图里排在第几列、第几栏（3×3 九宫格就是 3 列 3 栏），
+阅读页的对照表照同样的排法摆，
 同时更新 image_en / image_zh（合成一行），旧的显示、匯出和繁体转换都还能用。
 """
 from __future__ import annotations
@@ -54,6 +56,30 @@ def normalize_labels(raw) -> list[dict]:
     return out
 
 
+MAX_GRID = 6  # 一张图最多 6 列 / 6 栏，再多就是模型看错了
+
+
+def normalize_panels(raw, labels: list[dict] | None = None) -> list[dict]:
+    """小图位置整理成 [{"panel", "row", "col"}]：编号要对得上标签里出现的小图，同一格只留一个，至少两张小图才有意义。"""
+    if not isinstance(raw, list):
+        return []
+    known = {x.get("panel") for x in labels or [] if x.get("panel")}
+    out, cells, names = [], set(), set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        panel = _panel(item.get("panel"))
+        try:
+            row, col = int(item.get("row")), int(item.get("col"))
+        except (TypeError, ValueError):
+            continue
+        if not panel or panel in names or (known and panel not in known) or not (1 <= row <= MAX_GRID and 1 <= col <= MAX_GRID) or (row, col) in cells:
+            continue
+        names.add(panel); cells.add((row, col))
+        out.append({"panel": panel, "row": row, "col": col})
+    return out if len(out) >= 2 else []
+
+
 def joined(labels: list[dict], side: str) -> str:
     sep = "; " if side == "en" else "；"  # i18n-ok: 中文分隔符号
     return sep.join(x[side] for x in labels if x.get(side))
@@ -68,12 +94,14 @@ def prompt(block: dict, target: str, image_hint: str = "") -> str:
         "流程框、節點或其他看得懂的標籤（label）。刻度上的數字、年份、單純的符號不用列。"  # i18n-ok
         "這張圖如果由多張小圖組成（圖上印著 (a)、(b)… 或 A、B…），每一項都要標上 panel（只寫圖上印的編號，例如 a、g），"  # i18n-ok
         "依小圖的順序逐一列出，每張小圖的軸名、圖例各自列；單張圖 panel 留空。"  # i18n-ok
+        "有多張小圖時，另外用 panels 寫出每張小圖在整張圖裡的位置：第幾列 row、第幾欄 col（從 1 起算，左上角是 row 1、col 1；例如 3×3 九宮格右下角是 row 3、col 3）。"  # i18n-ok
         "數學符號、上下標、單位一律寫成 $TeX$（例如 $j$ (mA cm$^{-2}$)、$Z'$ ($\\Omega$)），en 和 zh 用同樣的寫法。"  # i18n-ok
         "看不清楚或圖裡沒有的就不要列，不要猜，也不要把題注抄進來。專有名詞與縮寫保留原文。\n"  # i18n-ok
         + (image_hint + "\n" if image_hint else "") +
         "只輸出一個 JSON 物件，不要任何別的文字：\n"  # i18n-ok
         '{"labels": [{"panel": "a", "role": "x", "en": "Year", "zh": "年份"}, {"panel": "a", "role": "y", "en": "Cumulative abnormal return (%)", "zh": "累積異常報酬（%）"}, '  # i18n-ok
-        '{"panel": "b", "role": "y", "en": "$j$ (mA cm$^{-2}$)", "zh": "電流密度 $j$ (mA cm$^{-2}$)"}]}'  # i18n-ok
+        '{"panel": "b", "role": "y", "en": "$j$ (mA cm$^{-2}$)", "zh": "電流密度 $j$ (mA cm$^{-2}$)"}], '  # i18n-ok
+        '"panels": [{"panel": "a", "row": 1, "col": 1}, {"panel": "b", "row": 1, "col": 2}]}'  # i18n-ok
     )
 
 
@@ -119,6 +147,7 @@ def extract(ws, block_id: str, cfg: dict, cancel=None, meter=None) -> list[dict]
         labels = normalize_labels((data or {}).get("labels") if isinstance(data, dict) else data)
         if not labels:
             raise engines.EngineError(tr("模型没有在图里找到可辨识的文字"))
+        panels = normalize_panels((data or {}).get("panels") if isinstance(data, dict) else None, labels)
         if target == "zh-TW":
             from . import traditional
             holder = {"blocks": [{"image_labels": labels}]}
@@ -129,6 +158,10 @@ def extract(ws, block_id: str, cfg: dict, cancel=None, meter=None) -> list[dict]
             for b in p.get("blocks", []):
                 if b.get("id") == block_id:
                     b["image_labels"] = labels
+                    if panels:
+                        b["image_panels"] = panels
+                    else:
+                        b.pop("image_panels", None)
                     b["image_en"] = joined(labels, "en")
                     b["image_zh"] = joined(labels, "zh")
                     if not b.get("src") and str(image).startswith(str(ws.root)):

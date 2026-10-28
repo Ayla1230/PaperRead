@@ -136,8 +136,24 @@
         }
         groups.sort((a, b) => (a.key ? 1 : 0) - (b.key ? 1 : 0));  // 没编号的（整张图共用的）放最前面
         const head = (key) => key ? '<tr class="fl-panel"><th colspan="3"><span>' + PR.esc(b.num ? PR.t("图 {n}({p})", { n: b.num, p: key }) : "(" + key + ")") + "</span></th></tr>" : "";
-        imageText = '<div class="figure-translation fig-labels"><div class="figure-translation-label">' + PR.t("图内文字") + ask + "</div><table>" +
-          groups.map((g) => head(g.key) + g.rows.map(row).join("")).join("") + "</table></div>";
+        // 小图有位置（例如 3×3 九宫格）：对照表照原图的列、栏摆成同样的格子；窄屏幕时 CSS 改回一栏
+        const pos = {};
+        (Array.isArray(b.image_panels) ? b.image_panels : []).forEach((x) => { if (x && x.panel) pos[x.panel] = x; });
+        const placed = groups.filter((g) => g.key && pos[g.key]);
+        const cols = Math.max(0, ...placed.map((g) => pos[g.key].col));
+        let body;
+        if (placed.length >= 2 && cols >= 2) {
+          const shared = groups.filter((g) => !g.key || !pos[g.key]);
+          const item = (x) => '<li><span class="fl-role">' + PR.esc(PR.FIG_ROLE[x.role] || PR.FIG_ROLE.label) + '</span><span class="fl-zh">' + PR.md(x.zh || "", { cite: false, xref: false }) +
+            '</span>' + (x.en && x.en !== x.zh ? '<span class="fl-en" lang="en">' + PR.md(x.en, { cite: false, xref: false }) + "</span>" : "") + "</li>";
+          const cell = (g) => '<div class="fl-cell" style="--r:' + pos[g.key].row + ";--c:" + pos[g.key].col + '"><div class="fl-chip"><span>' +
+            PR.esc(b.num ? PR.t("图 {n}({p})", { n: b.num, p: g.key }) : "(" + g.key + ")") + "</span></div><ul>" + g.rows.map(item).join("") + "</ul></div>";
+          body = (shared.length ? "<table>" + shared.map((g) => head(g.key) + g.rows.map(row).join("")).join("") + "</table>" : "") +
+            '<div class="fl-grid" style="--cols:' + cols + '">' + placed.map(cell).join("") + "</div>";
+        } else {
+          body = "<table>" + groups.map((g) => head(g.key) + g.rows.map(row).join("")).join("") + "</table>";
+        }
+        imageText = '<div class="figure-translation fig-labels"><div class="figure-translation-label">' + PR.t("图内文字") + ask + "</div>" + body + "</div>";
       } else if (b.image_zh || b.image_en) {
         imageText = '<div class="figure-translation"><div class="figure-translation-label">' + PR.t("图内文字") + ask + '</div>' + zhDiv(key) + enIfZh(key, b.image_en) + '</div>';
       } else if (ask) {

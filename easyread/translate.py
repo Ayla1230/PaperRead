@@ -266,6 +266,17 @@ def _batches(pages: list[int], size: int, en_pages: set[int]) -> list[list[int]]
     return out
 
 
+SPEEDS = ("standard", "fast", "fastest")
+
+
+def with_speed(cfg: dict) -> tuple[dict, str]:
+    """设置里的翻译速度。最快：API 的推理强度没设时用 low（翻译用不着长时间思考；思考 token 也算用量）。不改到传进来的 cfg。"""
+    speed = cfg.get("speed") if cfg.get("speed") in SPEEDS else "standard"
+    if speed == "fastest" and isinstance(cfg.get("openai"), dict) and not cfg["openai"].get("reasoning_effort"):
+        cfg = {**cfg, "openai": {**cfg["openai"], "reasoning_effort": "low"}}
+    return cfg, speed
+
+
 def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, meter=None, read=False) -> dict[int, str]:
     """翻译给定的页（已完成的页会重译并替换；只读原文整理过的页就地补译文）。report(done, total, message)；
     meter 收集 token 用量。read：只读原文，把页整理成块但不翻译。返回没做成的页 {页码: 原因}。"""
@@ -285,12 +296,16 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
         original_report = report
         report = lambda done, total, message: original_report(done + len(blank), total + len(blank), message)
     cfg = engines.for_translation(cfg)  # 本机 CLI 不加载用户的 MCP、多余的工具定义（问 AI 不走这里）
+    cfg, speed = with_speed(cfg)
     paper = ws.load("paper")
     total_pages = paper.get("meta", {}).get("page_count") or 0
     en_pages = set() if read else set(paper.get("translation", {}).get("en_pages", []))
     size = max(1, int(cfg.get("batch_pages") or 2))
     # 分段并行：切成几段连续的页同时译，段内一批接一批（见 segments.py）
-    k = segments.workers(cfg.get("concurrency"), len(_batches(pages, size, en_pages)))
+    n_batches = len(_batches(pages, size, en_pages))
+    k = segments.workers(cfg.get("concurrency"), n_batches)
+    if speed != "standard":  # 快速：每批各自一段，全部同时送（最多 8 段）；调用次数不变，每段多带一点前文
+        k = max(k, min(segments.MAX_LANES, n_batches))
     lanes = [_batches(seg, size, en_pages) for seg in segments.plan(pages, size, k, ws.root)]
     batches = [b for lane in lanes for b in lane]
     verb = tr("正在整理原文") if read else tr("正在翻译")

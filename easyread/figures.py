@@ -107,8 +107,13 @@ def normalize_figure(block: dict) -> None:
         if value:
             block[key] = str(value).strip()
     if "image_labels" in block:  # 标题、X/Y 轴、图例的中英对照（见 figure_text.py）
-        from .figure_text import joined, normalize_labels
+        from .figure_text import joined, normalize_labels, normalize_panels
         labels = normalize_labels(block.get("image_labels"))
+        panels = normalize_panels(block.get("image_panels"), labels) if labels else []
+        if panels:
+            block["image_panels"] = panels
+        else:
+            block.pop("image_panels", None)
         if labels:
             block["image_labels"] = labels
             block["image_en"] = block.get("image_en") or joined(labels, "en")

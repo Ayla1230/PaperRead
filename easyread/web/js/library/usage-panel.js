@@ -42,7 +42,16 @@
       '<p class="hint">' + PR.t("用你自己的 API Key 调用模型的次数和 token，由 PaperRead 在这台电脑上记录。") + "</p>" +
       (provs.length ? provs.map(providerHtml).join("") : '<p class="ud-empty">' + PR.t("还没有用 API 调用过模型。翻译或问 AI 之后，这里会显示今天用了多少、什么时候重置。") + "</p>") +
       (claude ? '<section class="ud-prov"><div class="ud-head"><b>' + PR.t("Claude 订阅（Claude Code）") + '</b></div><div class="ud-card">' + claude + "</div></section>" : "") +
+      speedHtml() +
       '<div class="actions"><span class="grow"></span><button class="btn" data-u="close">' + PR.t("关闭") + "</button></div>";
+  }
+
+  /* 最下面：翻译速度三选一，每档写明要多用多少（存进设置，下一篇翻译开始生效） */
+  function speedHtml() {
+    const cur = (data && data.speed) || "standard";
+    return '<section class="ud-prov"><div class="ud-head"><b>' + PR.t("翻译速度") + "</b><em>" + PR.t("下一次翻译开始生效") + "</em></div>" +
+      PR.SPEEDS.map(([id, name, note]) => '<label class="ud-card ud-speed' + (id === cur ? " on" : "") + '"><input type="radio" name="ud-speed" value="' + id + '"' + (id === cur ? " checked" : "") + ">" +
+        "<span><b>" + name + '</b><span class="us-split">' + note + "</span></span></label>").join("") + "</section>";
   }
 
   /* 顶栏按钮：有设上限或已用完时直接显示百分比 */
@@ -80,6 +89,14 @@
     if (b && b.dataset.u === "refresh") load();
   });
   dlg().addEventListener("change", async (e) => {
+    if (e.target.name === "ud-speed") {
+      try {
+        await PR.api("/api/config", { method: "POST", body: { speed: e.target.value } });
+        data = { ...(data || {}), speed: e.target.value }; render();
+        PR.toast(PR.t("已改成「{name}」，下一次翻译开始生效", { name: (PR.SPEEDS.find((x) => x[0] === e.target.value) || [])[1] }));
+      } catch (err) { PR.toast(PR.esc(err.message)); }
+      return;
+    }
     const input = e.target.closest("[data-limit]");
     if (!input) return;
     try {
