@@ -1,0 +1,10 @@
+/* 极浅浮水印「Ayla1230」：斜排平铺在阅读页上（离线版、手机版、打印、存成 PDF 也有）。
+   放在正文后面、点不到，不影响选取、复制、划线；深色模式改用浅色字 */
+.watermark {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; user-select: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='190'%3E%3Ctext x='150' y='105' text-anchor='middle' transform='rotate(-24 150 95)' font-family='Georgia,serif' font-size='22' letter-spacing='3' fill='%23000' fill-opacity='0.045'%3EAyla1230%3C/text%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+:root[data-theme="dark"] .watermark { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='190'%3E%3Ctext x='150' y='105' text-anchor='middle' transform='rotate(-24 150 95)' font-family='Georgia,serif' font-size='22' letter-spacing='3' fill='%23fff' fill-opacity='0.05'%3EAyla1230%3C/text%3E%3C/svg%3E"); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .watermark { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='190'%3E%3Ctext x='150' y='105' text-anchor='middle' transform='rotate(-24 150 95)' font-family='Georgia,serif' font-size='22' letter-spacing='3' fill='%23fff' fill-opacity='0.05'%3EAyla1230%3C/text%3E%3C/svg%3E"); } }
+@media print { .watermark { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
