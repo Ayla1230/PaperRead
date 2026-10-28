@@ -2113,5 +2113,16 @@
   "測量量表與來源": "Measurement scales and sources",
   "樣本與研究情境": "Sample and context",
   "分析方法": "Analysis method",
-  "假設與檢定結果": "Hypotheses and test results"
+  "假設與檢定結果": "Hypotheses and test results",
+  "也可以按 📎 或把 PDF 拖进来，直接问这篇论文。": "You can also press 📎 or drop a PDF here to ask about that paper.",
+  "正在加入文献库…": "Adding to library…",
+  "没能加入文献库：{msg}": "Could not add to library: {msg}",
+  "论文还在加入文献库，稍等一下再问": "The paper is still being added to the library; ask again in a moment",
+  "读不到这篇 PDF 的文字（可能是扫描档），请先在文献库里整理或翻译后再问": "Could not read text from this PDF (it may be scanned); prepare or translate it in the library first",
+  "读了：": "Read:",
+  "这一问不带这篇论文": "Ask without this paper",
+  "问这篇论文，例如：研究架构是什么？用了哪些量表？": "Ask about this paper, e.g. what is the research framework? Which scales were used?",
+  "附上 PDF（会加入文献库，不翻译）": "Attach a PDF (added to the library, not translated)",
+  "，太长只读了前后大部分": " — too long, read most of the beginning and end",
+  "放开就附上这篇 PDF": "Drop to attach this PDF"
 }

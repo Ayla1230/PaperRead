@@ -84,8 +84,11 @@
       node.addEventListener("click", (e) => pickPage(e, i + 1));
       node.addEventListener("mousemove", (e) => {
         const r = node.getBoundingClientRect();
-        node.classList.toggle("pickable", !!blockAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, i + 1));
+        const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        node.classList.toggle("pickable", !!blockAt(x, y, i + 1));
+        hoverPdfSentence(sentenceAt(x, y, i + 1));
       });
+      node.addEventListener("mouseleave", () => hoverPdfSentence(null));
       return { node, img, hl };
     });
     scroller.replaceChildren(...pageNodes.map(p => p.node));
@@ -149,6 +152,7 @@
   }, { passive: true });
 
   function highlightBlock(page, blockId) {
+    sentShown = null;
     pageNodes.forEach(p => p.hl.classList.remove("on"));
     const hl = pageNodes[page - 1].hl;
     const loc = blockId && S.layout[blockId];
@@ -184,6 +188,122 @@
       scroller.scrollTo({ top: Math.max(0, pageTop(node) - 18), behavior: "smooth" });
     }
   }
+
+  /* ---------- 逐句对应：左边指着哪一句，原页就框哪一句（layout.json 的 snts 是每句逐行的框） ---------- */
+  let sentShown = null;  // { id, key, i }
+  const sentBoxes = (id, key, i) => { const l = S.layout[id]; return (l && l.snts && l.snts[key] && l.snts[key][i]) || null; };
+  function markLeft(key, i) {
+    PR.$$("#paper .snt.pv-snt").forEach((n) => n.classList.remove("pv-snt"));
+    if (key == null) return;
+    const zh = PR.$('#paper .zh[data-key="' + CSS.escape(key) + '"]');
+    if (!zh) return;
+    const en = PR.enOfZh ? PR.enOfZh(zh) : null;
+    [zh, en].forEach((host) => host && PR.$$(':scope > .snt[data-s="' + i + '"]', host).forEach((n) => n.classList.add("pv-snt")));
+  }
+  /* 原页上把这一句框出来；scroll：句子不在面板可见范围就滚过去 */
+  PR.showSentence = function (id, key, i, scroll) {
+    if (PR.side !== "pages") return false;
+    const boxes = sentBoxes(id, key, i), loc = S.layout[id];
+    if (!boxes || !loc) return false;
+    if (sentShown && sentShown.id === id && sentShown.key === key && sentShown.i === i) return true;
+    if (pvBlock !== id || !pageNodes[loc.page - 1] || !pageNodes[loc.page - 1].hl.classList.contains("on")) {
+      pvBlock = id; pvPage = loc.page; ensurePages(); loadNearby(pvPage); updatePageLabel(); highlightBlock(pvPage, id);
+    }
+    const entry = pageNodes[loc.page - 1];
+    PR.$$(".pv-region.sent", entry.hl).forEach((n) => n.remove());
+    PR.$$(".pv-region", entry.hl).forEach((n) => n.classList.add("dim"));
+    boxes.forEach(([x0, y0, x1, y1]) => {
+      const region = document.createElement("div");
+      region.className = "pv-region sent";
+      Object.assign(region.style, { left: (x0 * 100 - 0.3) + "%", top: (y0 * 100 - 0.25) + "%", width: ((x1 - x0) * 100 + 0.6) + "%", height: ((y1 - y0) * 100 + 0.5) + "%" });
+      entry.hl.append(region);
+    });
+    entry.hl.classList.add("on");
+    sentShown = { id, key, i };
+    markLeft(key, i);
+    if (scroll) {
+      const top = pageTop(entry.node) + boxes[0][1] * entry.node.offsetHeight;
+      const bottom = pageTop(entry.node) + boxes[boxes.length - 1][3] * entry.node.offsetHeight;
+      const view0 = scroller.scrollTop + 40, view1 = scroller.scrollTop + scroller.clientHeight - 40;
+      if (top < view0 || bottom > view1) {
+        panelInput = false; programmaticUntil = Date.now() + 1200;
+        scroller.scrollTo({ top: Math.max(0, (top + bottom) / 2 - scroller.clientHeight * 0.4), behavior: "smooth" });
+      }
+    }
+    return true;
+  };
+  PR.clearSentence = function () {
+    if (!sentShown) return;
+    const loc = S.layout[sentShown.id];
+    sentShown = null;
+    markLeft(null);
+    const entry = loc && pageNodes[loc.page - 1];
+    if (!entry) return;
+    PR.$$(".pv-region.sent", entry.hl).forEach((n) => n.remove());
+    PR.$$(".pv-region.dim", entry.hl).forEach((n) => n.classList.remove("dim"));
+  };
+  /* 原页上滑过某一句 → 左边对应的那句（原文和译文）一起亮 */
+  function sentenceAt(x, y, page) {
+    for (const id in S.layout) {
+      const l = S.layout[id];
+      if (l.page !== page || !l.snts || !PR.blockById[id]) continue;
+      for (const key in l.snts) {
+        const list = l.snts[key];
+        for (let i = 0; i < list.length; i++) {
+          if ((list[i] || []).some(([x0, y0, x1, y1]) => x >= x0 - 0.004 && x <= x1 + 0.004 && y >= y0 - 0.003 && y <= y1 + 0.003)) return { id, key, i };
+        }
+      }
+    }
+    return null;
+  }
+  function hoverPdfSentence(hit) {
+    if (!hit) { if (sentShown && sentShown.fromPdf) PR.clearSentence(); return; }
+    if (PR.showSentence(hit.id, hit.key, hit.i, false)) sentShown.fromPdf = true;
+  }
+  /* 左边滑过一句 → 原页框这一句（原页面板开着时） */
+  document.addEventListener("mouseover", (e) => {
+    if (PR.side !== "pages") return;
+    const snt = e.target.closest && e.target.closest("#paper .snt");
+    if (!snt) return;
+    const host = snt.parentElement;
+    const zh = host && (host.classList.contains("zh") ? host : PR.zhOfEl && PR.zhOfEl(host));
+    const blk = snt.closest(".blk");
+    if (!zh || !zh.dataset.key || !blk) return;
+    holdUntil = Date.now() + 1500;  // 别让滚动跟随马上换掉
+    PR.showSentence(blk.dataset.id, zh.dataset.key, Number(snt.dataset.s), true);
+  });
+  document.addEventListener("mouseout", (e) => {
+    if (!sentShown || sentShown.fromPdf || PR.side !== "pages") return;
+    const from = e.target.closest && e.target.closest("#paper .snt");
+    const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest("#paper .snt");
+    if (from && !to) followSentence();
+  });
+  /* 滚动时跟随：阅读线（视口上方 30%）穿过的那一句 */
+  function followSentence() {
+    if (PR.side !== "pages" || !PR.$(".pv-follow input").checked || Date.now() < holdUntil) return;
+    const id = PR.readingBlock && PR.readingBlock();
+    const blk = id && document.getElementById("b-" + id);
+    const loc = S.layout[id];
+    if (!blk || !loc || !loc.snts) { PR.clearSentence(); return; }
+    const line = PR.readingLine();
+    let hit = null;
+    for (const zh of PR.$$(".zh[data-key]", blk)) {
+      if (!loc.snts[zh.dataset.key]) continue;
+      // 显示的是原文还是译文都行：两边的句子编号一样，挑看得见的那一边
+      const hosts = [zh, PR.enOfZh ? PR.enOfZh(zh) : null].filter((h) => h && h.getClientRects().length);
+      for (const host of hosts) {
+        for (const n of PR.$$(":scope > .snt", host)) {
+          const r = n.getBoundingClientRect();
+          if (!r.height) continue;
+          if (r.top <= line) hit = { key: zh.dataset.key, i: Number(n.dataset.s) };
+        }
+        if (hit) break;
+      }
+    }
+    if (!hit) { const first = Object.keys(loc.snts)[0]; hit = first ? { key: first, i: 0 } : null; }
+    if (hit) PR.showSentence(id, hit.key, hit.i, true); else PR.clearSentence();
+  }
+  PR.syncSentence = PR.throttle ? PR.throttle(followSentence, 150) : followSentence;
 
   /* 译文里和原页框对应的那段也标出来（同一个颜色），一眼看出左右是哪两段 */
   let paired = null, holdUntil = 0;
@@ -234,10 +354,11 @@
       if (force || pvBlock) { pvBlock = null; showPage(1); }
       return;
     }
-    if (!force && id === pvBlock) return;
+    if (!force && id === pvBlock) return followSentence();
     pvBlock = id;
     const loc = S.layout[id];
     showPage(loc ? loc.page : b.page, id);
+    followSentence();
   };
 
   PR.$(".pv-follow input")?.addEventListener("change", () => {

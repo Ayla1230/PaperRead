@@ -64,6 +64,11 @@ body.resizing .side-panel { transition: none; }
 .pv-hl { position: absolute; inset: 0; pointer-events: none; transition: opacity .25s ease; opacity: 0; }
 .pv-region { position: absolute; border-radius: 3px; background: rgba(236, 196, 92, .22); box-shadow: 0 0 0 2px rgba(214, 160, 40, .55); }
 .pv-hl.on { opacity: 1; }
+/* 逐句对应：原页上这一句用蓝框，所在段落的黄框变淡；左边对应的原文、译文句子同色底 */
+.pv-region.dim { background: rgba(236, 196, 92, .08); box-shadow: 0 0 0 1px rgba(214, 160, 40, .3); }
+.pv-region.sent { background: rgba(74, 130, 195, .22); box-shadow: 0 0 0 1.5px rgba(74, 130, 195, .75); border-radius: 2px; }
+body.pv-open #paper .snt.pv-snt { background: rgba(74, 130, 195, .14); box-shadow: 0 0 0 2px rgba(74, 130, 195, .14); border-radius: 3px; }
+:root[data-theme="dark"] body.pv-open #paper .snt.pv-snt { background: rgba(110, 160, 214, .2); box-shadow: 0 0 0 2px rgba(110, 160, 214, .2); }
 .pv-page.pickable { cursor: pointer; }
 /* 正文里和原页框对应的段：同一个琥珀色，左边一道竖条 + 很淡的底色，不抢正文 */
 body.pv-open .blk.pv-pair { background: rgba(236, 196, 92, .09); box-shadow: 0 0 0 6px rgba(236, 196, 92, .09); }

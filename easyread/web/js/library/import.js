@@ -170,6 +170,7 @@
   window.addEventListener("dragenter", (e) => { if (!hasFiles(e)) return; depth++; overlay.classList.add("on"); });
   window.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) overlay.classList.remove("on"); });
   window.addEventListener("dragover", (e) => { if (hasFiles(e)) e.preventDefault(); });
+  PR.resetDropOverlay = () => { depth = 0; overlay.classList.remove("on"); };  // 问 AI 面板自己接住拖进来的档案时用
   window.addEventListener("drop", (e) => {
     if (!hasFiles(e)) return;
     e.preventDefault(); depth = 0; overlay.classList.remove("on");

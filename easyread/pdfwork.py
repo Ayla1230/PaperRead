@@ -117,7 +117,7 @@ def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 
 
 _MATH = re.compile(r"\$[^$]*\$")
 _ALNUM = re.compile(r"[a-z0-9]")
-LOCATE_VERSION = "5"  # 图形范围按页面上看得见的像素收边；旧论文打开时重算。
+LOCATE_VERSION = "6"  # 找不到时也查前后各页；每句话记下逐行的框（snts）；旧论文打开时重算。
 
 
 def _norm(s: str) -> str:
@@ -171,6 +171,94 @@ def _boxes(chars, idx, a: int, b: int) -> list[list[float]]:
     return boxes
 
 
+def _line_boxes(chars, idx, a: int, b: int) -> list[list[float]]:
+    """一句话在原页上的逐行框：同一行（纵向重叠）、同一栏（横向相连）的字符并成一个框，
+    这样高亮只落在这句话的字上，不会把同一行前后别的句子也框进去。"""
+    seen, rows = set(), []
+    for k in range(a, min(b + 1, len(idx))):
+        i = idx[k]
+        if i in seen:
+            continue
+        seen.add(i)
+        box = chars[i][1:5]
+        if not (box[2] > box[0] and box[3] > box[1]):
+            continue
+        last = rows[-1] if rows else None
+        height = (box[3] - box[1]) or 0.01
+        same_line = last and abs((last[1] + last[3]) / 2 - (box[1] + box[3]) / 2) < height * 0.6 \
+            and box[0] >= last[0] - 0.01 and box[0] - last[2] < 0.03
+        if same_line:
+            rows[-1] = _bounds([last, box])
+        else:
+            rows.append(list(box))
+    return [[round(v, 4) for v in r] for r in rows]
+
+
+def _utf16_slice(text: str, a: int, b: int) -> str:
+    """sents 里的位置是 JS 字符串位置（UTF-16 码元），按同样的单位切。"""
+    raw = text.encode("utf-16-le")
+    return raw[a * 2:b * 2].decode("utf-16-le", errors="ignore")
+
+
+def _sentence_spans(en: str, sents) -> list[str]:
+    if not isinstance(sents, list) or len(sents) < 2:
+        return []
+    out, prev = [], 0
+    for row in sents:
+        if not isinstance(row, list) or len(row) < 1:
+            return []
+        out.append(_utf16_slice(en, prev, row[0]))
+        prev = row[0]
+    return out
+
+
+def _sentence_boxes(text: str, idx, chars, a: int, end: int, en: str, sents) -> list | None:
+    """段落里每一句在原页上的逐行框：按句子开头的字依次往后找，下一句的开头就是这一句的结尾。
+    找不到的句子记 None（前端就退回整段高亮）。"""
+    spans = _sentence_spans(en, sents)
+    if not spans:
+        return None
+    starts, pos = [], a
+    for span in spans:
+        norm = _norm(_MATH.sub(" ", span))
+        head = norm[:16]
+        hit = text.find(head, pos, end + 1) if len(head) >= 4 else -1
+        starts.append(hit)
+        if hit >= 0:
+            pos = hit + max(1, len(head))
+    out = []
+    for i, start in enumerate(starts):
+        if start < 0:
+            out.append(None)
+            continue
+        nxt = next((x for x in starts[i + 1:] if x > start), end + 1)
+        out.append(_line_boxes(chars, idx, start, nxt - 1) or None)
+    return out if any(out) else None
+
+
+def _snts(block: dict, text: str, idx, chars, a: int, end: int) -> dict:
+    """{键: [每句的逐行框或 None]}；段落的键是块 id，列表项是 id#序号（和页面上的 data-key 一致）。"""
+    out = {}
+    if block.get("type") == "para" and block.get("en"):
+        got = _sentence_boxes(text, idx, chars, a, end, block["en"], block.get("sents"))
+        if got:
+            out[block["id"]] = got
+    elif block.get("type") == "list":
+        pos = a
+        for i, item in enumerate(block.get("items") or []):
+            if not isinstance(item, dict) or not item.get("en"):
+                continue
+            head = _anchors(item["en"])[0][:16]
+            start = text.find(head, pos, end + 1) if head else -1
+            if start < 0:
+                continue
+            got = _sentence_boxes(text, idx, chars, start, end, item["en"], item.get("sents"))
+            if got:
+                out[f"{block['id']}#{i}"] = got
+            pos = start + 1
+    return out
+
+
 def block_english(block: dict) -> str:
     if block.get("type") == "list":
         return " ".join(it.get("en", "") for it in block.get("items", []))
@@ -193,6 +281,13 @@ def _locate(root: Path) -> dict:
     def stream(n):
         return _page_stream(extract_dir, n)
 
+    # 往远处的页找时只要每页的文字（几千字，很小），对上了才载入那页的字符框
+    @lru_cache(maxsize=None)
+    def page_text(n):
+        st = _page_stream(extract_dir, n)
+        return st[0] if st else ""
+
+    total = len(list(extract_dir.glob("page-*.chars.json")))
     layout: dict[str, dict] = {}
     cursor: dict[int, int] = {}
     for block in paper.get("blocks", []):
@@ -208,7 +303,15 @@ def _locate(root: Path) -> dict:
         heads = [head]
         if block.get("type") == "heading" and block.get("num"):
             heads.insert(0, _anchors(f"{block['num']} {block.get('en', '')}")[0])
-        for pn in (page, page + 1):
+        # 模型给的页码偶尔会错（跨页的段落、没认出页眉的页）：先找它说的那页和下一页，
+        # 找不到再往前后各页找。远处的页只认够长的开头，免得短句子撞到别处的同样字词。
+        near = (page, page + 1)
+        far = sorted((n for n in range(1, total + 1) if n not in near), key=lambda n: (abs(n - page), n))
+        for pn in near + tuple(far):
+            if pn not in near and (len(head) < 20 or head not in page_text(pn)):
+                if len(head) < 20:
+                    break
+                continue
             st = stream(pn)
             if not st:
                 continue
@@ -228,6 +331,9 @@ def _locate(root: Path) -> dict:
             layout[bid] = {"page": pn, "box": _bounds(boxes), "src": "text" if b >= 0 else "head"}
             if len(boxes) > 1:
                 layout[bid]["boxes"] = boxes
+            snts = _snts(block, text, idx, chars, a, end)
+            if snts:
+                layout[bid]["snts"] = snts
             cursor[pn] = end
             break
     _extend_captioned(paper.get("blocks", []), layout, root)
@@ -329,6 +435,8 @@ def _fill_gaps(blocks: list[dict], layout: dict):
         bid = block.get("id")
         if not bid or bid in layout or not block.get("page"):
             continue
+        if _norm(block_english(block)):
+            continue  # 有英文却没在原页找到：不要猜一个大框（会框住整页，看起来像对上了），宁可不框
         page = block["page"]
         locs = _page_locs(layout, page)
         prev = next((layout[b["id"]] for b in reversed(blocks[:i]) if layout.get(b.get("id"), {}).get("page") == page), None)
