@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect x="32" y="32" width="960" height="960" rx="250" fill="#2f6173"/>
+  <!-- tail curling up on the right, behind everything -->
+  <path d="M738 742 C 850 720, 872 600, 812 548" fill="none" stroke="#f5f2ec" stroke-width="44" stroke-linecap="round"/>
+  <!-- ears -->
+  <path d="M318 352 L 300 176 L 452 266 Z" fill="#f5f2ec" stroke="#f5f2ec" stroke-width="28" stroke-linejoin="round"/>
+  <path d="M706 352 L 724 176 L 572 266 Z" fill="#f5f2ec" stroke="#f5f2ec" stroke-width="28" stroke-linejoin="round"/>
+  <path d="M338 300 L 330 228 L 400 268 Z" fill="#e0a84f"/>
+  <path d="M686 300 L 694 228 L 624 268 Z" fill="#e0a84f"/>
+  <!-- head -->
+  <ellipse cx="512" cy="430" rx="232" ry="200" fill="#f5f2ec"/>
+  <!-- eyes: content, half-closed reading eyes -->
+  <path d="M398 418 Q 432 446 466 418" fill="none" stroke="#2f6173" stroke-width="22" stroke-linecap="round"/>
+  <path d="M558 418 Q 592 446 626 418" fill="none" stroke="#2f6173" stroke-width="22" stroke-linecap="round"/>
+  <!-- nose + mouth -->
+  <path d="M494 470 L 530 470 L 512 492 Z" fill="#e0a84f" stroke="#e0a84f" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M512 494 Q 512 516 488 520 M512 494 Q 512 516 536 520" fill="none" stroke="#2f6173" stroke-width="12" stroke-linecap="round"/>
+  <!-- whiskers -->
+  <g stroke="#a0b6bd" stroke-width="10" stroke-linecap="round">
+    <path d="M370 478 L 270 466"/><path d="M372 504 L 278 516"/>
+    <path d="M654 478 L 754 466"/><path d="M652 504 L 746 516"/>
+  </g>
+  <!-- open book held in front -->
+  <path d="M190 600 Q 350 566 506 616 L 506 812 Q 350 768 190 800 Z" fill="#f5f2ec"/>
+  <path d="M834 600 Q 674 566 518 616 L 518 812 Q 674 768 834 800 Z" fill="#f5f2ec"/>
+  <g stroke-linecap="round" stroke-width="26">
+    <path d="M250 660 L 440 672" stroke="#a0b6bd"/>
+    <path d="M250 716 L 440 724" stroke="#a0b6bd"/>
+    <path d="M584 672 L 774 660" stroke="#e0a84f"/>
+    <path d="M584 724 L 774 716" stroke="#e0a84f"/>
+  </g>
+  <!-- paws over the book edge -->
+  <ellipse cx="300" cy="604" rx="58" ry="40" fill="#f5f2ec" stroke="#2f6173" stroke-width="12"/>
+  <ellipse cx="724" cy="604" rx="58" ry="40" fill="#f5f2ec" stroke="#2f6173" stroke-width="12"/>
+</svg>
