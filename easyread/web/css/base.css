@@ -192,3 +192,4 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border-radius: 4px; box-shadow: 
 input[type=range] { accent-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 .btn.icon.lang-btn { font: 600 12.5px/1 var(--ui); letter-spacing: .02em; }  /* 顶栏的 中 / EN */
+sup.sig { font-size: .7em; letter-spacing: -.03em; margin-left: .06em; line-height: 0; }  /* 显著性星号 0.25*** */

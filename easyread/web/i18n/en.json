@@ -2222,5 +2222,19 @@
   "这个浏览器不支持文字标色，请更新浏览器或用桌面版。": "This browser can't colour text; update it or use the desktop app.",
   "这篇没有找到研究变数": "No research variables found in this paper",
   "这篇还没有内容": "This paper has no content yet",
-  "重新找": "Find again"
+  "重新找": "Find again",
+  "p 值越小，结果越不像是偶然；常用门槛是 0.05。这里只依数字判断，解读以论文为准。": "The smaller the p-value, the less likely the result is due to chance; the usual threshold is 0.05. This is judged from the numbers only; rely on the paper for interpretation.",
+  "{stars} 表示 p < {p}：": "{stars} means p < {p}: ",
+  "不显著（p > {p}）": "Not significant (p > {p})",
+  "不显著：p = {p} 大于 0.05，不能排除是偶然": "Not significant: p = {p} is above 0.05, so chance can't be ruled out",
+  "只在 10% 水准下边缘显著，证据偏弱": "Only marginally significant at the 10% level; weak evidence",
+  "在 0.1% 水准下显著，极不可能是偶然": "Significant at the 0.1% level; extremely unlikely to be chance",
+  "在 1% 水准下显著，很不可能是偶然": "Significant at the 1% level; very unlikely to be chance",
+  "在 5% 水准下显著（一般常用的门槛）": "Significant at the 5% level (the usual threshold)",
+  "方向为正": "positive direction",
+  "方向为负": "negative direction",
+  "显著性说明": "Significance notes",
+  "请 AI 白话解释这段结果": "Ask AI to explain these results in plain words",
+  "请用白话解释这段的统计结果：每个系数和 p 值代表什么、哪些显著、哪些不显著，实际意义是什么。": "Please explain this paragraph's statistical results in plain words: what each coefficient and p-value means, which are significant and which are not, and what they mean in practice.",
+  "，{dir}": ", {dir}"
 }

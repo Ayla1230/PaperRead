@@ -157,8 +157,16 @@
 
   function inline(text, opts) {
     let s = blockLabel(PR.esc(text).replace(/\\\$/g, "$"));
+    // 显著性星号（0.25***、(0.05)**、表注 *p < .05, **p < .01）不是粗体、斜体记号：先换成占位符，最后排成上标
+    const sig = [];
+    const keep = (stars) => "\u0000" + (sig.push(stars) - 1) + "\u0000";
+    // 前面同一行有还没收尾的同长度星号（**2%**、*0.5*）就是粗体、斜体的收尾，不当显著性
+    const closesEmphasis = (text, at, n) => ((text.slice(0, at).match(/\*+/g) || []).filter((r) => r.length === n).length % 2) === 1;
+    s = s.replace(/([\d)）%])(\*{1,3})(?!\*)/g, (m, before, stars, at, all) => closesEmphasis(all, at + before.length, stars.length) ? m : before + keep(stars));
+    s = s.replace(/(^|[\s(（,，;；:：、])(\*{1,3})(?=\s*[pP]\s*(?:&lt;|&gt;|=|≤|≥|＜))/g, (m, before, stars) => before + keep(stars));
     s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+    if (sig.length) s = s.replace(/\u0000(\d+)\u0000/g, (m, i) => '<sup class="sig">' + sig[+i] + "</sup>");
     s = s.replace(/(?<!\\)\[\^(\d{1,3})\]/g, (raw, n) => {
       const ix = PR.footnoteIndex, key = opts.footnotePage + ":" + n;
       const id = ix && (ix.pages.has(key) ? ix.pages.get(key) : ix.all.get(n));

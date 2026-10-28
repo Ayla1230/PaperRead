@@ -5,7 +5,7 @@
   const body = document.body;
 
   /* ---------- 偏好 ---------- */
-  const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation", pvColor: "blue", pvStrength: "normal", pvPara: "normal", pvLayers: "word,line,sent", pvWord: "underline" }, PR.TYPE_DEFAULTS);
+  const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation", pvColor: "blue", pvStrength: "normal", pvPara: "normal", pvLayers: "word,line,sent", pvWord: "underline", sigBox: true }, PR.TYPE_DEFAULTS);
   /* 原页逐字逐句对照的颜色（左右两边一起用）：颜色和浓度都可以在“Aa”里改 */
   PR.PV_COLORS = [["blue", "37,99,195", PR.t("蓝")], ["green", "34,139,72", PR.t("绿")], ["red", "205,55,55", PR.t("红")], ["purple", "124,72,196", PR.t("紫")], ["orange", "222,120,10", PR.t("橙")]];
   PR.PV_STRENGTH = { light: 0.7, normal: 1.3, strong: 2 };
@@ -37,6 +37,7 @@
     const layers = pvLayers();
     ["word", "line", "sent"].forEach((k) => body.classList.toggle("pv-no-" + k, !layers.has(k)));
     body.classList.toggle("pv-word-fill", p.pvWord === "fill");
+    body.classList.toggle("no-sigbox", p.sigBox === false || p.sigBox === "false");
     if (PR.applyReadingLanguage) PR.applyReadingLanguage();
     PR.ls.set("easyread-prefs", Object.assign(PR.migratePrefs(PR.ls.get("easyread-prefs", {})), p));
     if (PR.store.mode === "server") PR.savePrefs("reader", p);
@@ -73,6 +74,7 @@
       '<div class="row"><span>' + PR.t("原页标示") + '</span><div class="seg pv-layers">' + [["sent", PR.t("句")], ["line", PR.t("行")], ["word", PR.t("字")]].map(([k, label]) =>
         '<button data-pv-layer="' + k + '" class="' + (pvLayers().has(k) ? "on" : "") + '" aria-pressed="' + pvLayers().has(k) + '">' + label + "</button>").join("") + "</div></div>" +
       '<div class="row"><span>' + PR.t("字的标示") + "</span>" + segHtml("pvWord", [["underline", PR.t("底线")], ["fill", PR.t("填色")]]) + "</div>" +
+      '<div class="row"><span>' + PR.t("显著性说明") + "</span>" + segHtml("sigBox", [[true, PR.t("显示")], [false, PR.t("收起")]]) + "</div>" +
       '<div class="row"><span>' + PR.t("段落框") + "</span>" + segHtml("pvPara", [["off", PR.t("关")], ["light", PR.t("淡")], ["normal", PR.t("标准")], ["strong", PR.t("深")]]) + "</div>" +
       '<div class="row hintrow"><button class="linkish" data-reset-type>' + PR.t("恢复默认") + '</button><span class="grow"></span>' +
       (PR.store.mode === "server" ? '<button class="linkish" data-open-settings="reading">' + PR.t("更多设置…") + "</button>" : "") + "</div>";
@@ -102,7 +104,7 @@
     const b = e.target.closest("[data-p]");
     if (!b) return;
     let v = b.dataset.v;
-    if (b.dataset.p === "margin") v = v === "true";
+    if (b.dataset.p === "margin" || b.dataset.p === "sigBox") v = v === "true";
     PR.setPref(b.dataset.p, v);
   });
   /* 排版全部回到默认（主题不动）；opts 传进来就用它（设置里改过的默认值） */

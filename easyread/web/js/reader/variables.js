@@ -35,7 +35,7 @@
     const root = PR.$("#paper");
     if (!root) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => n.parentElement.closest(".katex, .sticky-layer, textarea, input, script, style, .fig-text-btn, .refs") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+      acceptNode: (n) => n.parentElement.closest(".katex, .sticky-layer, .sig-box, textarea, input, script, style, .fig-text-btn, .refs") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
     });
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       re.lastIndex = 0;

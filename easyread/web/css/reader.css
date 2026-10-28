@@ -418,3 +418,17 @@ body.dual-margin.no-margin #margin-left, body.dual-margin.no-margin #margin { di
   .fl-grid { grid-template-columns: minmax(0, 1fr); }
   .fl-cell { grid-row: auto; grid-column: auto; }
 }
+
+/* 显著性说明框：放在报告统计结果那段的下面，淡底小字 */
+.sig-box { margin: .5em 0 .2em; padding: .55em .85em .5em; border-radius: 8px; background: color-mix(in srgb, var(--accent) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); font: 12.5px/1.75 var(--ui); color: var(--ink-2); user-select: text; }
+.sig-h { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--accent); font-size: 12px; }
+.sig-h .linkish { font-weight: 400; font-size: 12px; }
+.sig-box ul { list-style: none; margin: .25em 0 .2em; padding: 0; }
+.sig-box li { padding-left: 1.05em; position: relative; }
+.sig-box li::before { content: ""; position: absolute; left: .15em; top: .72em; width: .45em; height: .45em; border-radius: 50%; background: var(--ink-3); }
+.sig-box li.sig::before { background: #2f8a57; }
+.sig-box li.weak::before { background: #c99a2e; }
+.sig-box li b { font-weight: 600; color: var(--ink); margin-right: .45em; font-variant-numeric: tabular-nums; }
+.sig-f { font-size: 11px; color: var(--ink-3); }
+body.no-sigbox .sig-box { display: none; }
+@media print { .sig-box { break-inside: avoid; } }
