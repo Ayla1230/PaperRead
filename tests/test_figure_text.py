@@ -36,7 +36,8 @@ class ExtractTest(unittest.TestCase):
                 labels = figure_text.extract(ws, "fig1", cfg)
             sent_cfg, _, _, images = run.call_args[0][:4]
             self.assertTrue(sent_cfg["openai"]["vision"])          # 这次一定附图
-            self.assertEqual(images, [root / "figures" / "crop-1-abc.webp"])
+            # macOS 的暂存目录是 /var → /private/var、Windows 可能是 8.3 短路径：比较解析后的真实路径
+            self.assertEqual([Path(p).resolve() for p in images], [(root / "figures" / "crop-1-abc.webp").resolve()])
             self.assertFalse(cfg["openai"]["vision"])               # 不改动原本的设定
             block = ws.load("paper")["blocks"][0]
             self.assertEqual(block["image_labels"], labels)
