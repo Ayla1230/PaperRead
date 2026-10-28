@@ -46,6 +46,23 @@ class SentenceLayoutTest(unittest.TestCase):
         self.assertEqual(result["page"], 2)
         self.assertEqual(result["src"], "text")
 
+    def test_paragraph_continued_from_previous_page_is_found(self):
+        # 段落开头 "press reports of" 在上一页，这页从 "independent and efficient" 开始（正是使用者截图那种情况）
+        parts_en = ["press reports of independent and efficient judicial system, so the existing laws are performed poorly. ",
+                    "In addition, codes of ethics in Chinese listed firms are still being formed. ",
+                    "Therefore, one cannot assume that environmental laws can restrain Chinese enterprises."]
+        parts_zh = ["報導由於缺乏獨立司法體系，現行法律執行不力。", "此外，中國上市公司的道德規範仍在形塑中。", "因此，我們不能假設環境法律能夠約束中國企業。"]
+        en, zh = "".join(parts_en), "".join(parts_zh)
+        self.page(4, "Something about media coverage that ends this page with a lack of free ")
+        self.page(5, "550 X. Du " + en[len("press reports of "):] + " Hypotheses Development follows here.")
+        write_json_atomic(self.root / "paper.json", {"blocks": [
+            {"id": "p5-1", "page": 5, "type": "para", "en": en, "zh": zh, "sents": sents(en, zh, parts_en, parts_zh)}]})
+        result = pdfwork.locate(self.root)["p5-1"]
+        self.assertEqual(result["page"], 5)
+        snts = result["snts"]["p5-1"]
+        self.assertEqual(len(snts), 3)
+        self.assertTrue(all(snts))  # 第一句只有後半在這頁，也要框得到
+
     def test_unmatched_text_block_gets_no_guessed_box(self):
         self.page(1, "Completely different words appear on this page of the document. " * 2)
         write_json_atomic(self.root / "paper.json", {"blocks": [

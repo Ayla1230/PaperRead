@@ -117,7 +117,7 @@ def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 
 
 _MATH = re.compile(r"\$[^$]*\$")
 _ALNUM = re.compile(r"[a-z0-9]")
-LOCATE_VERSION = "6"  # 找不到时也查前后各页；每句话记下逐行的框（snts）；旧论文打开时重算。
+LOCATE_VERSION = "7"  # 从上一页接过来的段落也找得到；每句话记下逐行的框（snts）；旧论文打开时重算。
 
 
 def _norm(s: str) -> str:
@@ -226,6 +226,8 @@ def _sentence_boxes(text: str, idx, chars, a: int, end: int, en: str, sents) -> 
         starts.append(hit)
         if hit >= 0:
             pos = hit + max(1, len(head))
+    if starts and starts[0] < 0 and (len(starts) == 1 or starts[1] < 0 or starts[1] > a):
+        starts[0] = a  # 第一句的开头在上一页：这页上这段从哪里开始，第一句就从哪里开始
     out = []
     for i, start in enumerate(starts):
         if start < 0:
@@ -257,6 +259,34 @@ def _snts(block: dict, text: str, idx, chars, a: int, end: int) -> dict:
                 out[f"{block['id']}#{i}"] = got
             pos = start + 1
     return out
+
+
+def _find_start(text: str, plain: str, heads: list[str], since: int = 0) -> int:
+    """段落开头在这页文字里的位置；找不到返回 -1。
+    先用开头几个字找；找不到时（段落是从上一页接过来的，开头那几个字在上一页；或模型把跨页的字重复了一次），
+    改用段落里往后的片段找，对上了再往前一个字一个字比对，退到这页上真正的开头。"""
+    for h in heads:
+        if not h:
+            continue
+        a = text.find(h, since)
+        if a < 0:
+            a = text.find(h)
+        if a >= 0:
+            return a
+    if len(plain) < 48:
+        return -1
+    for o in range(6, min(len(plain) - 28, 480), 6):
+        probe = plain[o:o + 28]
+        a = text.find(probe, since)
+        if a < 0:
+            a = text.find(probe)
+        if a < 0:
+            continue
+        k = 0
+        while a - k - 1 >= 0 and o - k - 1 >= 0 and text[a - k - 1] == plain[o - k - 1]:
+            k += 1
+        return a - k
+    return -1
 
 
 def block_english(block: dict) -> str:
@@ -305,24 +335,20 @@ def _locate(root: Path) -> dict:
             heads.insert(0, _anchors(f"{block['num']} {block.get('en', '')}")[0])
         # 模型给的页码偶尔会错（跨页的段落、没认出页眉的页）：先找它说的那页和下一页，
         # 找不到再往前后各页找。远处的页只认够长的开头，免得短句子撞到别处的同样字词。
+        plain = _norm(_MATH.sub(" ", block_english(block)))
         near = (page, page + 1)
         far = sorted((n for n in range(1, total + 1) if n not in near), key=lambda n: (abs(n - page), n))
         for pn in near + tuple(far):
-            if pn not in near and (len(head) < 20 or head not in page_text(pn)):
-                if len(head) < 20:
-                    break
-                continue
+            if pn not in near:
+                if len(plain) < 20:
+                    break  # 太短的字在别页很容易撞到一样的，不往远处找
+                if _find_start(page_text(pn), plain, [head if len(head) >= 20 else ""]) < 0:
+                    continue
             st = stream(pn)
             if not st:
                 continue
             text, idx, chars = st
-            a = -1
-            for h in heads:
-                a = text.find(h, cursor.get(pn, 0) if pn == page else 0)
-                if a < 0:
-                    a = text.find(h)
-                if a >= 0:
-                    break
+            a = _find_start(text, plain, heads, cursor.get(pn, 0) if pn == page else 0)
             if a < 0:
                 continue
             b = text.find(tail, a) if tail else -1

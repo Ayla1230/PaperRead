@@ -270,7 +270,11 @@
     const blk = snt.closest(".blk");
     if (!zh || !zh.dataset.key || !blk) return;
     holdUntil = Date.now() + 1500;  // 别让滚动跟随马上换掉
-    PR.showSentence(blk.dataset.id, zh.dataset.key, Number(snt.dataset.s), true);
+    const id = blk.dataset.id;
+    if (PR.showSentence(id, zh.dataset.key, Number(snt.dataset.s), true)) return;
+    // 这一句在原页上没对到（扫描档、跨页的那一截）：至少框出整段
+    const loc = S.layout[id];
+    if (loc && pvBlock !== id) { pvBlock = id; showPage(loc.page, id); }
   });
   document.addEventListener("mouseout", (e) => {
     if (!sentShown || sentShown.fromPdf || PR.side !== "pages") return;

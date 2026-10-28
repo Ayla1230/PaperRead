@@ -1,12 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs><mask id="m"><rect width="512" height="512" fill="#fff"/>
-    <path d="M178 262 Q 204 286 230 262" fill="none" stroke="#000" stroke-width="20" stroke-linecap="round"/>
-    <path d="M282 262 Q 308 286 334 262" fill="none" stroke="#000" stroke-width="20" stroke-linecap="round"/>
-    <path d="M240 308 L 272 308 L 256 328 Z" fill="#000" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
-  </mask></defs>
-  <g mask="url(#m)" fill="#111">
-    <path d="M110 210 L 98 52 L 228 132 Z" stroke="#111" stroke-width="24" stroke-linejoin="round"/>
-    <path d="M402 210 L 414 52 L 284 132 Z" stroke="#111" stroke-width="24" stroke-linejoin="round"/>
-    <ellipse cx="256" cy="282" rx="196" ry="172"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <g transform="translate(512 512) scale(1.12) translate(-470 -560)" fill="#111" stroke="#111">
+    <ellipse cx="450" cy="660" rx="185" ry="200"/>
+    <ellipse cx="410" cy="772" rx="188" ry="112"/>
+    <ellipse cx="562" cy="568" rx="122" ry="172" transform="rotate(-12 562 568)"/>
+    <circle cx="602" cy="404" r="128"/>
+    <ellipse cx="716" cy="436" rx="42" ry="33"/>
+    <path d="M524 336 L 538 222 L 604 300 Z" stroke-linejoin="round" stroke-width="26"/>
+    <path d="M602 292 L 652 200 L 690 316 Z" stroke-linejoin="round" stroke-width="26"/>
+    <rect x="572" y="590" width="94" height="285" rx="44"/>
+    <ellipse cx="652" cy="858" rx="58" ry="26"/>
+    <path d="M300 826 C 186 866, 236 916, 362 906 L 566 906" fill="none" stroke-width="54" stroke-linecap="round"/>
+
   </g>
 </svg>
