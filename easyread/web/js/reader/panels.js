@@ -5,7 +5,10 @@
   const body = document.body;
 
   /* ---------- 偏好 ---------- */
-  const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation" }, PR.TYPE_DEFAULTS);
+  const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation", pvColor: "blue", pvStrength: "normal" }, PR.TYPE_DEFAULTS);
+  /* 原页逐字逐句对照的颜色（左右两边一起用）：颜色和浓度都可以在“Aa”里改 */
+  PR.PV_COLORS = [["blue", "37,99,195", PR.t("蓝")], ["green", "34,139,72", PR.t("绿")], ["red", "205,55,55", PR.t("红")], ["purple", "124,72,196", PR.t("紫")], ["orange", "222,120,10", PR.t("橙")]];
+  PR.PV_STRENGTH = { light: 0.7, normal: 1.3, strong: 2 };
   /* 1.3.1 测试版存过 readingLanguage（zh / en），换成 lead；传进来的是存下的原样，还没合默认值 */
   PR.migratePrefs = function (p) {
     if (p.lead == null && p.readingLanguage != null) p.lead = p.readingLanguage === "en" ? "original" : "translation";
@@ -23,6 +26,9 @@
     body.classList.toggle("font-sans", p.font === "sans");
     body.classList.toggle("mode-bi", p.mode === "bi" || p.mode === "sent");  // 逐句对照没对齐的段落照双语显示
     body.classList.toggle("no-margin", !p.margin);
+    const pvc = PR.PV_COLORS.find(([k]) => k === p.pvColor) || PR.PV_COLORS[0];
+    root.style.setProperty("--pvc", pvc[1]);
+    root.style.setProperty("--pva", String(PR.PV_STRENGTH[p.pvStrength] || PR.PV_STRENGTH.normal));
     if (PR.applyReadingLanguage) PR.applyReadingLanguage();
     PR.ls.set("easyread-prefs", Object.assign(PR.migratePrefs(PR.ls.get("easyread-prefs", {})), p));
     if (PR.store.mode === "server") PR.savePrefs("reader", p);
@@ -54,6 +60,8 @@
       slider("fs", PR.t("字号"), 13, 28, 1, " px") + slider("measure", PR.t("版心"), 26, 50, 1, PR.t(" 字")) + slider("lh", PR.t("行距"), 1.5, 2.4, 0.05, "") +
       '<div class="row"><span>' + PR.t("字体") + "</span>" + segHtml("font", [["serif", PR.t("宋体")], ["sans", PR.t("黑体")]]) + "</div>" +
       '<div class="row"><span>' + PR.t("边注") + "</span>" + segHtml("margin", [[true, PR.t("显示")], [false, PR.t("收起")]]) + "</div>" +
+      '<div class="row"><span>' + PR.t("对照颜色") + "</span>" + segHtml("pvColor", PR.PV_COLORS.map(([k, rgb, name]) => [k, '<i class="pv-sw" style="background:rgb(' + rgb + ')" title="' + PR.esc(name) + '" aria-label="' + PR.esc(name) + '"></i>'])) + "</div>" +
+      '<div class="row"><span>' + PR.t("对照浓度") + "</span>" + segHtml("pvStrength", [["light", PR.t("淡")], ["normal", PR.t("标准")], ["strong", PR.t("深")]]) + "</div>" +
       '<div class="row hintrow"><button class="linkish" data-reset-type>' + PR.t("恢复默认") + '</button><span class="grow"></span>' +
       (PR.store.mode === "server" ? '<button class="linkish" data-open-settings="reading">' + PR.t("更多设置…") + "</button>" : "") + "</div>";
   };
