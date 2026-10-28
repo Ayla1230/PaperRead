@@ -5,10 +5,12 @@
   const body = document.body;
 
   /* ---------- 偏好 ---------- */
-  const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation", pvColor: "blue", pvStrength: "normal" }, PR.TYPE_DEFAULTS);
+  const DEF = Object.assign({ theme: "auto", mode: "zh", lead: "translation", biOrder: "translation", pvColor: "blue", pvStrength: "normal", pvPara: "normal", pvLayers: "word,line,sent", pvWord: "underline" }, PR.TYPE_DEFAULTS);
   /* 原页逐字逐句对照的颜色（左右两边一起用）：颜色和浓度都可以在“Aa”里改 */
   PR.PV_COLORS = [["blue", "37,99,195", PR.t("蓝")], ["green", "34,139,72", PR.t("绿")], ["red", "205,55,55", PR.t("红")], ["purple", "124,72,196", PR.t("紫")], ["orange", "222,120,10", PR.t("橙")]];
   PR.PV_STRENGTH = { light: 0.7, normal: 1.3, strong: 2 };
+  PR.PV_PARA = { off: 0, light: 0.6, normal: 1.3, strong: 2.2 };  // 原页上整段的黄框
+  const pvLayers = () => new Set(String(PR.prefs.pvLayers || "").split(",").filter(Boolean));
   /* 1.3.1 测试版存过 readingLanguage（zh / en），换成 lead；传进来的是存下的原样，还没合默认值 */
   PR.migratePrefs = function (p) {
     if (p.lead == null && p.readingLanguage != null) p.lead = p.readingLanguage === "en" ? "original" : "translation";
@@ -29,6 +31,12 @@
     const pvc = PR.PV_COLORS.find(([k]) => k === p.pvColor) || PR.PV_COLORS[0];
     root.style.setProperty("--pvc", pvc[1]);
     root.style.setProperty("--pva", String(PR.PV_STRENGTH[p.pvStrength] || PR.PV_STRENGTH.normal));
+    const para = PR.PV_PARA[p.pvPara] != null ? PR.PV_PARA[p.pvPara] : PR.PV_PARA.normal;
+    root.style.setProperty("--pvp", String(para));
+    body.classList.toggle("pv-no-para", para === 0);
+    const layers = pvLayers();
+    ["word", "line", "sent"].forEach((k) => body.classList.toggle("pv-no-" + k, !layers.has(k)));
+    body.classList.toggle("pv-word-fill", p.pvWord === "fill");
     if (PR.applyReadingLanguage) PR.applyReadingLanguage();
     PR.ls.set("easyread-prefs", Object.assign(PR.migratePrefs(PR.ls.get("easyread-prefs", {})), p));
     if (PR.store.mode === "server") PR.savePrefs("reader", p);
@@ -62,6 +70,10 @@
       '<div class="row"><span>' + PR.t("边注") + "</span>" + segHtml("margin", [[true, PR.t("显示")], [false, PR.t("收起")]]) + "</div>" +
       '<div class="row"><span>' + PR.t("对照颜色") + "</span>" + segHtml("pvColor", PR.PV_COLORS.map(([k, rgb, name]) => [k, '<i class="pv-sw" style="background:rgb(' + rgb + ')" title="' + PR.esc(name) + '" aria-label="' + PR.esc(name) + '"></i>'])) + "</div>" +
       '<div class="row"><span>' + PR.t("对照浓度") + "</span>" + segHtml("pvStrength", [["light", PR.t("淡")], ["normal", PR.t("标准")], ["strong", PR.t("深")]]) + "</div>" +
+      '<div class="row"><span>' + PR.t("原页标示") + '</span><div class="seg pv-layers">' + [["sent", PR.t("句")], ["line", PR.t("行")], ["word", PR.t("字")]].map(([k, label]) =>
+        '<button data-pv-layer="' + k + '" class="' + (pvLayers().has(k) ? "on" : "") + '" aria-pressed="' + pvLayers().has(k) + '">' + label + "</button>").join("") + "</div></div>" +
+      '<div class="row"><span>' + PR.t("字的标示") + "</span>" + segHtml("pvWord", [["underline", PR.t("底线")], ["fill", PR.t("填色")]]) + "</div>" +
+      '<div class="row"><span>' + PR.t("段落框") + "</span>" + segHtml("pvPara", [["off", PR.t("关")], ["light", PR.t("淡")], ["normal", PR.t("标准")], ["strong", PR.t("深")]]) + "</div>" +
       '<div class="row hintrow"><button class="linkish" data-reset-type>' + PR.t("恢复默认") + '</button><span class="grow"></span>' +
       (PR.store.mode === "server" ? '<button class="linkish" data-open-settings="reading">' + PR.t("更多设置…") + "</button>" : "") + "</div>";
   };
@@ -81,6 +93,12 @@
     if (view) return PR.setView(view.dataset.view);
     const order = e.target.closest("[data-order]");
     if (order) return PR.setBiOrder(order.dataset.order);
+    const layer = e.target.closest("[data-pv-layer]");
+    if (layer) {  // 句、行、字可以各自开关（多选）
+      const set = pvLayers();
+      if (set.has(layer.dataset.pvLayer)) set.delete(layer.dataset.pvLayer); else set.add(layer.dataset.pvLayer);
+      return PR.setPref("pvLayers", ["sent", "line", "word"].filter((k) => set.has(k)).join(","));
+    }
     const b = e.target.closest("[data-p]");
     if (!b) return;
     let v = b.dataset.v;

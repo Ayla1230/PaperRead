@@ -106,6 +106,15 @@ def normalize_figure(block: dict) -> None:
         value = block.get(key) or block.pop(f"image_text_{lang}", "")
         if value:
             block[key] = str(value).strip()
+    if "image_labels" in block:  # 标题、X/Y 轴、图例的中英对照（见 figure_text.py）
+        from .figure_text import joined, normalize_labels
+        labels = normalize_labels(block.get("image_labels"))
+        if labels:
+            block["image_labels"] = labels
+            block["image_en"] = block.get("image_en") or joined(labels, "en")
+            block["image_zh"] = block.get("image_zh") or joined(labels, "zh")
+        else:
+            block.pop("image_labels", None)
 
 
 def prepare_figures(root, blocks: list[dict], total_pages: int) -> None:

@@ -113,6 +113,26 @@
     blockMenu(blk.dataset.id, { x: e.clientX, y: e.clientY });
   });
 
+  /* 图内文字：叫翻译引擎看这张图，列出标题、X / Y 轴、图例的中英对照（easyread/figure_text.py） */
+  PR.figureText = async function (id, btn) {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const label = btn.innerHTML;
+    btn.innerHTML = '<span class="spin"></span> ' + PR.t("辨识中…");
+    try {
+      const r = await PR.api("/api/p/" + PR.pid + "/figure-text", { method: "POST", body: { block: id } });
+      if (r.block) {
+        const list = S.paper.blocks || [];
+        const i = list.findIndex((x) => x && x.id === id);
+        if (i >= 0) { list[i] = r.block; PR.blockById[id] = r.block; }
+        PR.renderBlock(id);
+      }
+    } catch (e) {
+      btn.disabled = false; btn.innerHTML = label;
+      PR.toast(PR.t("没能辨识图内文字：{msg}", { msg: PR.esc(PR.errorText ? PR.errorText(e) : e.message) }));
+    }
+  };
+
   /* 段落里的按钮：页码、角标、过期提示 */
   document.addEventListener("click", (e) => {
     const cap = e.target.closest("#paper [data-page-cap]");
@@ -123,6 +143,7 @@
     const id = host && host.dataset.id;
     const b = PR.blockById[id];
     if (t.dataset.t === "page" && b) PR.openPage(b.page, id);
+    if (t.dataset.t === "figure-text" && b) return PR.figureText(id, t);
     if (t.dataset.t === "pin") host.classList.toggle("notes-open");
     if (t.dataset.t === "stale") PR.showStale(t.closest(".zh"));
     if (t.dataset.t === "retry-failed") PR.api("/api/p/" + PR.pid + "/translate", { method: "POST", body: { failed: true } }).then(() => { PR.toast(PR.t("正在重试，译好后自动替换")); PR.poll(); });

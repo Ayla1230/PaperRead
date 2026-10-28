@@ -203,6 +203,19 @@ table.tbl td .sub { color: var(--ink-3); }
 #paper button.link { padding: 0; border: 0; background: none; color: var(--ink-3); font: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: .2em; }
 #paper button.link:hover { color: var(--accent); }
 .tbl-orig { display: block; margin: .35em auto 0; font: 12px/1.5 var(--ui) !important; }
+/* 图内文字中英对照表：标题、X / Y 轴、图例 */
+.fig-labels table { width: 100%; border-collapse: collapse; margin-top: .25em; font-size: .95em; }
+.fig-labels th { width: 4.5em; padding: .28em .6em .28em 0; text-align: left; vertical-align: top; font: 12px/1.9 var(--ui); color: var(--accent); white-space: nowrap; font-weight: 500; }
+.fig-labels td { padding: .28em .8em .28em 0; vertical-align: top; border-top: 1px solid color-mix(in srgb, var(--accent) 14%, transparent); }
+.fig-labels tr:first-child td { border-top: 0; }
+.fig-labels .fl-zh { color: var(--ink); }
+.fig-labels .fl-en { font-family: var(--serif-en); color: var(--ink-2); }
+.fig-text-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 7px; font: 12.5px/1.4 var(--ui); color: var(--accent); background: var(--accent-soft); }
+.fig-text-btn:hover { background: var(--accent-soft-2); }
+.fig-text-btn:disabled { opacity: .7; cursor: progress; }
+.fig-text-btn.again { float: right; padding: 0 6px; background: none; font-size: 11.5px; color: var(--ink-3); }
+.fig-text-btn.again:hover { color: var(--accent); }
+.fig-text-ask { margin: .6em auto 0; text-align: center; }
 .fig-missing { display: block; width: 100%; padding: 1.4em; border: 1px dashed var(--rule-2); border-radius: 8px; color: var(--ink-3); font: 14px var(--ui); }
 .inline-note { padding: .6em 1em; border-left: 2px solid var(--accent); font: 14px/1.75 var(--ui); color: var(--ink-2); }
 .inline-note .lbl { font-size: 11.5px; color: var(--accent); }

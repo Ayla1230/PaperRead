@@ -62,13 +62,19 @@ body.resizing .side-panel { transition: none; }
 :root[data-theme="dark"] .pv-page img { filter: invert(.9) hue-rotate(180deg) contrast(.9); }
 :root[data-theme="dark"] .pv-page { background: #111; }
 .pv-hl { position: absolute; inset: 0; pointer-events: none; transition: opacity .25s ease; opacity: 0; }
-.pv-region { position: absolute; border-radius: 3px; background: rgba(236, 196, 92, .22); box-shadow: 0 0 0 2px rgba(214, 160, 40, .55); }
+/* 整段的黄框：浓度 --pvp 在“Aa → 段落框”里调，0 是关掉 */
+:root { --pvp: 1.3; }
+.pv-region { position: absolute; border-radius: 3px; background: rgba(236, 196, 92, calc(.18 * var(--pvp))); box-shadow: 0 0 0 2px rgba(214, 160, 40, min(1, calc(.5 * var(--pvp)))); }
 .pv-hl.on { opacity: 1; }
 /* 逐字逐句对照的颜色：--pvc 是颜色（RGB），--pva 是浓度倍数，阅读页“Aa”里可以改（panels.js 写进来） */
 :root { --pvc: 37, 99, 195; --pva: 1.3; }
 .pv-region.sent { background: rgba(var(--pvc), calc(.16 * var(--pva))); box-shadow: 0 0 0 1.5px rgba(var(--pvc), min(1, calc(.6 * var(--pva)))); border-radius: 2px; }
 .pv-region.line { background: rgba(var(--pvc), calc(.12 * var(--pva))); box-shadow: none; border-radius: 2px; border-bottom: 2px solid rgba(var(--pvc), min(1, calc(.7 * var(--pva)))); }
-.pv-region.word { background: rgba(var(--pvc), min(.85, calc(.38 * var(--pva)))); box-shadow: 0 0 0 1px rgba(var(--pvc), min(1, calc(.75 * var(--pva)))); border-radius: 2px; }
+/* 字：预设只画底线（原文字小时填色会盖住字）；“Aa → 字的标示”可以改成填色 */
+.pv-region.word { background: transparent; box-shadow: none; border-radius: 0; border-bottom: 3px solid rgba(var(--pvc), min(1, calc(.75 * var(--pva)))); }
+body.pv-word-fill .pv-region.word { background: rgba(var(--pvc), min(.85, calc(.38 * var(--pva)))); box-shadow: 0 0 0 1px rgba(var(--pvc), min(1, calc(.75 * var(--pva)))); border-bottom: 0; border-radius: 2px; }
+/* 字和行同时开着时，行就只留底线，免得叠两层色块看不清原文 */
+body:not(.pv-no-word) .pv-region.line { background: transparent; border-bottom-style: dashed; }
 .pv-region.sel { background: rgba(var(--pvc), min(.8, calc(.3 * var(--pva)))); box-shadow: none; border-radius: 1px; }
 ::highlight(pv-word) { background-color: rgba(var(--pvc), min(.8, calc(.3 * var(--pva)))); }
 body.pv-open #paper .snt.pv-snt { background: rgba(var(--pvc), calc(.12 * var(--pva))); box-shadow: 0 0 0 2px rgba(var(--pvc), calc(.12 * var(--pva))); border-radius: 3px; }
@@ -77,7 +83,9 @@ body.pv-open #paper .snt.pv-snt { background: rgba(var(--pvc), calc(.12 * var(--
 #settings [data-p="pvColor"] { padding-left: 7px; padding-right: 7px; }
 #settings [data-p="pvColor"].on .pv-sw { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px currentColor; }
 /* 逐句对应：原页上这一句用蓝框，所在段落的黄框变淡；左边对应的原文、译文句子同色底 */
-.pv-region.dim { background: rgba(236, 196, 92, .08); box-shadow: 0 0 0 1px rgba(214, 160, 40, .3); }
+.pv-region.dim { background: rgba(236, 196, 92, calc(.09 * var(--pvp))); box-shadow: 0 0 0 1.5px rgba(214, 160, 40, min(1, calc(.42 * var(--pvp)))); }
+body.pv-no-para .pv-region:not(.sent):not(.word):not(.line):not(.sel) { display: none; }
+body.pv-no-word .pv-region.word, body.pv-no-line .pv-region.line, body.pv-no-sent .pv-region.sent { display: none; }
 /* 逐字逐行：行（淡黄底线）、词（实心黄）、选取（蓝） */
 .pv-page.pickable { cursor: pointer; }
 /* 正文里和原页框对应的段：同一个琥珀色，左边一道竖条 + 很淡的底色，不抢正文 */

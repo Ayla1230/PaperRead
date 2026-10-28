@@ -522,6 +522,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._chat(ws, body)
             if action == "notehelp":
                 return notehelp.handle(self, ws, body)
+            if action == "figure-text":  # 图内文字：用翻译引擎看图，列出标题、X/Y 轴、图例的中英对照
+                from . import figure_text
+                labels = figure_text.extract(ws, str(body.get("block") or ""), config.load())
+                block = next((b for b in (ws.load("paper") or {}).get("blocks", []) if b.get("id") == body.get("block")), None)
+                return self._json(200, {"labels": labels, "block": block})
             if action == "discussion_del":
                 return self._json(200, {"deleted": paperdata.delete_discussion(ws, str(body.get("id", "")))})
             if action == "smart-annotate":

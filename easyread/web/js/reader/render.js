@@ -81,6 +81,7 @@
     return '<figure class="fig-page"><img data-t="page" loading="lazy" src="' + PR.imageUrl(p.img) + '" alt="' + PR.esc(label) + '">' +
       '<figcaption><button class="link" data-t="page">' + PR.esc(label) + "</button></figcaption></figure>";
   }
+  PR.FIG_ROLE = { title: PR.t("标题"), x: PR.t("X 轴"), y: PR.t("Y 轴"), legend: PR.t("图例"), label: PR.t("标签") };
   function linkify(t) { return PR.esc(t).replace(/(https?:\/\/[^\s<]+[^\s<.,;)])/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
 
   const R = {
@@ -116,7 +117,21 @@
     figure(b) {
       const img = b.src ? '<img src="' + PR.imageUrl(b.src) + '" alt="" loading="lazy">' : pageImageHtml(b, PR.t("图在原文第 {n} 页（点击放大）", { n: b.page }));
       const key = b.id + "#image";
-      const imageText = b.image_zh || b.image_en ? '<div class="figure-translation"><div class="figure-translation-label">' + PR.t("图内文字") + '</div>' + zhDiv(key) + enIfZh(key, b.image_en) + '</div>' : "";
+      const labels = Array.isArray(b.image_labels) ? b.image_labels.filter((x) => x && (x.en || x.zh)) : [];
+      // 能叫模型看图（服务端模式、有可用引擎）时，给一个“辨识图内文字”的按钮；已经有对照表时改成小字“重新辨识”
+      const canAsk = PR.store && PR.store.mode === "server" && PR.canAsk && PR.canAsk();
+      const ask = canAsk ? '<button class="fig-text-btn' + (labels.length ? " again" : "") + '" data-t="figure-text">' + PR.icon("sparkle", "sm") +
+        (labels.length ? PR.t("重新辨识") : PR.t("辨识图内文字（标题、X / Y 轴、图例）")) + "</button>" : "";
+      let imageText = "";
+      if (labels.length) {
+        imageText = '<div class="figure-translation fig-labels"><div class="figure-translation-label">' + PR.t("图内文字") + ask + "</div><table>" +
+          labels.map((x) => "<tr><th>" + PR.esc(PR.FIG_ROLE[x.role] || PR.FIG_ROLE.label) + '</th><td class="fl-zh">' + PR.md(x.zh || "", { cite: false, xref: false }) +
+            '</td><td class="fl-en" lang="en">' + PR.md(x.en || "", { cite: false, xref: false }) + "</td></tr>").join("") + "</table></div>";
+      } else if (b.image_zh || b.image_en) {
+        imageText = '<div class="figure-translation"><div class="figure-translation-label">' + PR.t("图内文字") + ask + '</div>' + zhDiv(key) + enIfZh(key, b.image_en) + '</div>';
+      } else if (ask) {
+        imageText = '<div class="fig-text-ask">' + ask + "</div>";
+      }
       return '<div class="figure-media">' + img + '</div>' + imageText + captionHtml(b);
     },
     note: (b) => '<div class="inline-note"><div class="lbl">' + PR.t("阅读批注（非原文）") + "</div>" + PR.mdBlocks(b.zh) + "</div>",
