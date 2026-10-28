@@ -321,6 +321,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"found": found, "ready": detect.ready(cfg, found), "engine": cfg.get("engine"), "models": cli_models.listing()})
         if path == "/api/prefs":
             return self._json(200, prefs.load())
+        if path == "/api/usage":  # 首页“今日用量”：各服务商今天用了多少、什么时候重置
+            return self._json(200, usage.summary())
         if path == "/api/ask":  # 文献库首页的“问 AI”：对话记录和能用的 API 模型
             return self._json(200, {"threads": ask.threads(), **ask.models()})
         if path == "/api/chat/models":
@@ -476,6 +478,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, settings_api.POST[path](json.loads(self._body() or b"{}")))
         if path == "/api/prefs":
             return self._json(200, prefs.save(json.loads(self._body() or b"{}")))
+        if path == "/api/usage/limit":  # 自己填的每日上限
+            body = json.loads(self._body() or b"{}")
+            return self._json(200, usage.set_limit(str(body.get("provider", "")), str(body.get("model", "")), body.get("limit")))
         if path == "/api/trash":  # 回收站：論文與摘要分別還原或永久刪除。
             body = json.loads(self._body() or b"{}")
             act, name, item_type = body.get("action"), body.get("name", ""), body.get("type", "paper")

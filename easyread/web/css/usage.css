@@ -45,3 +45,27 @@
 .us-legend { display: flex; gap: 12px; margin-top: 7px; font-size: 11px; color: var(--ink-3); }
 .us-legend span { display: inline-flex; align-items: center; gap: 4px; }
 .us-legend i { width: 7px; height: 7px; border-radius: 2px; }
+
+/* 首页“用量”对话框（学 Claude App 的使用量页：浅底白卡、名称在左、百分比在右、下面一根进度条） */
+#usageDlg .dialog { max-width: 520px; background: var(--bg); }
+.ud-top { display: flex; align-items: center; justify-content: space-between; }
+.ud-top h2 { margin: 0; }
+.ud-prov { display: grid; gap: 10px; margin-top: 18px; }
+.ud-head { display: flex; align-items: baseline; gap: 8px; }
+.ud-head b { font-size: 14px; color: var(--ink); }
+.ud-head em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.ud-tag { font-size: 11px; padding: 1px 7px; border-radius: 9px; color: var(--accent); background: var(--accent-soft); }
+.ud-sub { margin-top: -6px; }
+.ud-card { display: grid; gap: 4px; padding: 14px 16px; border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 1px var(--rule); }
+.ud-card .us-bar { height: 7px; border-radius: 4px; margin: 6px 0 4px; }
+.ud-card .us-bar i { border-radius: 4px; }
+.ud-card .us-row > span.ud-model { font-size: 14.5px; font-weight: 500; }
+.ud-card .us-row em b { font-size: 13.5px; margin-left: 0; }
+.ud-warn { font-size: 12px; color: var(--danger); }
+.ud-limit { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--ink-3); }
+.ud-limit input { width: 82px; height: 26px; padding: 0 8px; font-size: 12px; }
+.ud-empty { margin: 18px 0 6px; padding: 18px; border-radius: 12px; background: var(--surface); color: var(--ink-3); font-size: 13px; line-height: 1.7; }
+.us-foot a { color: var(--accent); }
+.usage-btn b { margin-left: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.usage-btn.high b { color: var(--ul-yellow); }
+.usage-btn.full b { color: var(--danger); }

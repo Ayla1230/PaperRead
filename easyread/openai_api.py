@@ -97,17 +97,29 @@ def _open(o: dict, body: dict, stream: bool):
         try:
             return http.urlopen(req, timeout=int(o.get("timeout") or 600))
         except urllib.error.HTTPError as e:
-            detail = e.read(300).decode("utf-8", "replace")
+            full = e.read(4000).decode("utf-8", "replace")  # Gemini 说明“每日额度用完”的 quotaId 在比较后面
+            detail = full[:300]
             e.close()
             drop = next((k for k in ("temperature", "stream_options") if k in detail and k in body), None)
             if e.code == 400 and drop:
                 body = {k: v for k, v in body.items() if k != drop}
                 continue
-            e.detail = detail
+            e.detail, e.detail_full = detail, full
             raise
 
 
-def _http_error(e: urllib.error.HTTPError) -> EngineError:
+def _count(o: dict, meter, res: dict) -> None:
+    """一次调用的用量：记进这次任务的 Meter，也记进首页“今日用量”（没有接口设置时只记 Meter）。"""
+    rec = usage.from_openai(res)
+    if meter is not None:
+        meter.add(**rec)
+    if o:
+        usage.record(o, rec)
+
+
+def _http_error(e: urllib.error.HTTPError, o: dict | None = None) -> EngineError:
+    if o is not None and e.code == 429 and usage.daily_quota_hit(getattr(e, "detail_full", "") or getattr(e, "detail", "")):
+        usage.record(o, exhausted=True)
     return EngineError(tr("接口返回 {code}{hint}：{detail}", code=e.code, hint=_hint(e.code), detail=getattr(e, "detail", "")))
 
 
@@ -125,14 +137,14 @@ def complete(o: dict, prompt: str, images: list[Path], cancel=None, meter=None, 
             if e.code in (429, 500, 502, 503, 504) and attempt < 3:
                 _sleep(_retry_after(e.headers.get("Retry-After"), 5 * 2 ** attempt), cancel)
                 continue
-            raise _http_error(e)
+            raise _http_error(e, o)
         except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
             if attempt < 2:
                 _sleep(5, cancel)
                 continue
             raise EngineError(tr("连不上接口：{err}", err=e))
-    if meter is not None and isinstance(res, dict):
-        meter.add(**usage.from_openai(res))
+    if isinstance(res, dict):
+        _count(o, meter, res)
     return _responses_text(res) if kind(o) == "responses" else _chat_text(res)
 
 
@@ -231,13 +243,13 @@ def stream(o: dict, text: str, cancel, meter=None, images: list[Path] | None = N
     try:
         r = _open(o, body, True)
     except urllib.error.HTTPError as e:
-        raise _http_error(e)
+        raise _http_error(e, o)
     except Exception as e:  # noqa: BLE001
         raise EngineError(tr("连不上接口：{err}", err=e))
     with r:
         if cancel.is_set():
             raise Cancelled()
-        pieces = _responses_pieces(r, cancel, meter) if kind(o) == "responses" else _chat_pieces(r, cancel, meter)
+        pieces = _responses_pieces(r, cancel, meter, o) if kind(o) == "responses" else _chat_pieces(r, cancel, meter, o)
         yield from _strip_think(pieces)
 
 
@@ -294,24 +306,29 @@ def _check_event(ev) -> dict:
     return ev
 
 
-def _chat_pieces(r, cancel, meter=None) -> Iterator[str]:
-    finished = False
+def _chat_pieces(r, cancel, meter=None, o: dict | None = None) -> Iterator[str]:
+    finished = counted = False
     for ev in _events(r, cancel):
         if ev is None:
+            if finished and not counted and o:
+                usage.record(o, {})  # 接口没给 token 数，次数还是要算
             return
         if ev.get("error"):
             raise EngineError(tr("接口返回出错：{err}", err=ev["error"]))
-        if ev.get("usage") and meter is not None:
-            meter.add(**usage.from_openai(ev))
+        if ev.get("usage"):
+            _count(o or {}, meter, ev)
+            counted = True
         choice = (ev.get("choices") or [{}])[0]
         _check_finish(choice.get("finish_reason"))
         finished = finished or bool(choice.get("finish_reason"))
         yield (choice.get("delta") or {}).get("content") or ""
     if not finished:
         raise EngineError(tr("接口连接提前结束，回答未完成，请重试。"))
+    if not counted and o:
+        usage.record(o, {})
 
 
-def _responses_pieces(r, cancel, meter=None) -> Iterator[str]:
+def _responses_pieces(r, cancel, meter=None, o: dict | None = None) -> Iterator[str]:
     for ev in _events(r, cancel):
         t = (ev or {}).get("type", "")
         if ev is None:
@@ -319,8 +336,7 @@ def _responses_pieces(r, cancel, meter=None) -> Iterator[str]:
         if t in ("response.completed", "response.incomplete", "response.failed"):
             res = ev.get("response") or {}
             _check_response_status({**res, "status": res.get("status") or t.split(".")[1]})
-            if meter is not None:
-                meter.add(**usage.from_openai(res))
+            _count(o or {}, meter, res)
             return
         if t == "response.output_text.delta":
             yield ev.get("delta") or ""

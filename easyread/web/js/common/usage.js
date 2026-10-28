@@ -28,6 +28,8 @@ window.PR = window.PR || {};
     return (d.getMonth() + 1) + " 月 " + d.getDate() + " 日 周" + "日一二三四五六"[d.getDay()] + " " + time + " 重置";  // i18n-ok
   }
 
+  PR.usageResetText = (ts) => resetText(ts);
+
   /* 额度进度条（Claude 订阅才有），排版学 Claude 桌面端：名字在左，“几小时后重置 + 百分比”在右，下面一根细条。
      额度是整个账号共用的，同时用 Claude Code 干别的也算在里面，所以不拿前后相减去算翻译用了多少 */
   PR.usageBars = function (limits, title) {

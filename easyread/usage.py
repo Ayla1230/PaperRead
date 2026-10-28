@@ -116,3 +116,130 @@ def from_openai(res: dict) -> dict:
     details = u.get("input_tokens_details") or {}
     return {"input": int(u.get("input_tokens") or 0), "cached": int(details.get("cached_tokens") or 0),
             "output": int(u.get("output_tokens") or 0)}
+
+
+# ---------- 今天用了多少 API（首页“用量”卡片） ----------
+# 服务商没有接口能查剩余额度，所以自己记：每次调用 API 后按服务商、模型累加当天的次数和 token。
+# Gemini 的每日额度在太平洋时间午夜重置（官方文档），其他服务商按本机时间的午夜算“今天”。
+# 服务商回 429 且说明是每日额度用完，就标记为“已用完”，到重置时间自动解除。
+import datetime as _dt
+import re as _re
+
+_ledger_lock = threading.Lock()
+_PACIFIC_HOSTS = ("generativelanguage.googleapis.com",)
+
+
+def _ledger_path():
+    return config.library_dir() / ".api_usage.json" if config.temp_library() else config.HOME / "api_usage.json"
+
+
+def _nth_sunday(year: int, month: int, n: int) -> _dt.date:
+    first = _dt.date(year, month, 1)
+    return first + _dt.timedelta(days=(6 - first.weekday()) % 7 + 7 * (n - 1))
+
+
+def _pacific_offset(utc: _dt.datetime) -> int:
+    """太平洋时间相对 UTC 差几小时（夏令时 -7，其余 -8）。不用 zoneinfo：Windows 打包版没有时区资料库。"""
+    y = utc.year
+    start = _dt.datetime.combine(_nth_sunday(y, 3, 2), _dt.time(10), _dt.timezone.utc)  # 3 月第二个周日 02:00 PST
+    end = _dt.datetime.combine(_nth_sunday(y, 11, 1), _dt.time(9), _dt.timezone.utc)    # 11 月第一个周日 02:00 PDT
+    return -7 if start <= utc < end else -8
+
+
+def _window(tz: str, now: float) -> tuple[str, float]:
+    """(今天的日期, 下次重置的时间戳)。"""
+    utc = _dt.datetime.fromtimestamp(now, _dt.timezone.utc)
+    if tz == "pacific":
+        local = utc + _dt.timedelta(hours=_pacific_offset(utc))
+        midnight = _dt.datetime.combine(local.date() + _dt.timedelta(days=1), _dt.time(0), _dt.timezone.utc)
+        reset = midnight - _dt.timedelta(hours=_pacific_offset(midnight - _dt.timedelta(hours=8)))
+        return local.date().isoformat(), reset.timestamp()
+    local = _dt.datetime.fromtimestamp(now)
+    midnight = _dt.datetime.combine(local.date() + _dt.timedelta(days=1), _dt.time(0))
+    return local.date().isoformat(), midnight.timestamp()
+
+
+def provider_of(o: dict) -> dict:
+    """接口设置 → {"id", "name", "tz", "free", "usage_url"}。"""
+    from . import presets
+    base = (o.get("base_url") or "").strip().lower()
+    host = _re.sub(r"^\w+://", "", base).split("/")[0]
+    pid = o.get("preset") or ""
+    found = next((p for p in presets.PRESETS if (pid and p["id"] == pid) or (p.get("base_url") and host and host in p["base_url"].lower())), None)
+    if found:
+        pid = found["id"]
+    pid = pid or host or "api"
+    tz = "pacific" if any(h in base for h in _PACIFIC_HOSTS) or pid == "gemini" else "local"
+    return {"id": pid, "name": (found or {}).get("name") or host or "API", "tz": tz, "free": bool((found or {}).get("free")),
+            "usage_url": "https://aistudio.google.com/rate-limit" if tz == "pacific" else ""}
+
+
+def _fresh(entry: dict, tz: str, now: float) -> dict:
+    day, _ = _window(tz, now)
+    if entry.get("day") != day:
+        entry.update(day=day, models={}, exhausted={})
+    return entry
+
+
+def record(o: dict, rec: dict | None = None, exhausted: bool = False, now: float | None = None) -> None:
+    """记一次 API 调用；exhausted=True 表示服务商说今天的额度用完了。出错只跳过，不影响翻译。"""
+    try:
+        now = time.time() if now is None else now
+        prov, model = provider_of(o), (o.get("model") or "").strip() or "?"
+        with _ledger_lock:
+            data = read_json(_ledger_path(), None) or {}
+            entry = _fresh(data.setdefault("providers", {}).setdefault(prov["id"], {}), prov["tz"], now)
+            entry.update(name=prov["name"], tz=prov["tz"], free=prov["free"], usage_url=prov["usage_url"])
+            m = entry["models"].setdefault(model, {"calls": 0, "input": 0, "output": 0})
+            if exhausted:
+                entry["exhausted"][model] = True
+                m["limited"] = m.get("limited", 0) + 1
+            else:
+                m["calls"] += 1
+                m["input"] += int((rec or {}).get("input") or 0)
+                m["output"] += int((rec or {}).get("output") or 0)
+            write_json_atomic(_ledger_path(), data)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def daily_quota_hit(detail: str) -> bool:
+    """429 的内容是不是“每日额度用完”（Gemini 的 quotaId 带 PerDay），而不是每分钟限流。"""
+    return bool(_re.search(r"PerDay|per[ _-]?day|daily", detail or "", _re.I))
+
+
+def set_limit(provider: str, model: str, limit) -> dict:
+    """使用者自己填的每日上限（次数）。填 0 或空就拿掉。"""
+    with _ledger_lock:
+        data = read_json(_ledger_path(), None) or {}
+        limits = data.setdefault("limits", {})
+        key = provider + "/" + model
+        try:
+            n = int(limit or 0)
+        except (TypeError, ValueError):
+            n = 0
+        if n > 0:
+            limits[key] = n
+        else:
+            limits.pop(key, None)
+        write_json_atomic(_ledger_path(), data)
+    return summary()
+
+
+def summary(now: float | None = None) -> dict:
+    now = time.time() if now is None else now
+    data = read_json(_ledger_path(), None) or {}
+    limits = data.get("limits") or {}
+    out = []
+    for pid, entry in (data.get("providers") or {}).items():
+        tz = entry.get("tz") or "local"
+        day, reset = _window(tz, now)
+        models = entry.get("models") if entry.get("day") == day else {}
+        exhausted = entry.get("exhausted") if entry.get("day") == day else {}
+        keys = set(models or {}) | {k.split("/", 1)[1] for k in limits if k.startswith(pid + "/")}
+        rows = [{"model": k, **(models or {}).get(k, {"calls": 0, "input": 0, "output": 0}),
+                 "exhausted": bool((exhausted or {}).get(k)), "limit": limits.get(pid + "/" + k)} for k in sorted(keys)]
+        out.append({"id": pid, "name": entry.get("name") or pid, "tz": tz, "free": bool(entry.get("free")), "usage_url": entry.get("usage_url") or "",
+                    "day": day, "reset_at": int(reset), "models": rows})
+    out.sort(key=lambda p: -sum(r["calls"] for r in p["models"]))
+    return {"providers": out, "claude": latest(), "now": int(now)}
