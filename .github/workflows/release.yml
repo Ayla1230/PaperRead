@@ -13,6 +13,8 @@ jobs:
   build:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -60,10 +62,21 @@ jobs:
             dist/electron/*.dmg
             dist/electron/*.dmg.blockmap
           if-no-files-found: error
+      # 各平台建好就先把自己的安裝檔掛到發佈頁，不用等其他平台（GitHub 的 Mac 機器常常排很久或被取消）
+      - name: Attach this platform's installer to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(dist/electron/*.exe dist/electron/*.blockmap dist/electron/latest*.yml dist/electron/*.AppImage dist/electron/*.dmg)
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "Installers are being attached."
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
 
   release:
     name: Attach installers to GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: always() && startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     permissions:
