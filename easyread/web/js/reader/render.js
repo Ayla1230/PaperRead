@@ -124,9 +124,20 @@
         (labels.length ? PR.t("重新辨识") : PR.t("辨识图内文字（标题、X / Y 轴、图例）")) + "</button>" : "";
       let imageText = "";
       if (labels.length) {
+        // 多张小图（a、b…）：按小图分组，每组前面一行“图 3(a)”，同一页好几张小图也分得清
+        const row = (x) => "<tr><th>" + PR.esc(PR.FIG_ROLE[x.role] || PR.FIG_ROLE.label) + '</th><td class="fl-zh">' + PR.md(x.zh || "", { cite: false, xref: false }) +
+          '</td><td class="fl-en" lang="en">' + PR.md(x.en || "", { cite: false, xref: false }) + "</td></tr>";
+        const groups = [];
+        for (const x of labels) {
+          const key = x.panel || "";
+          let g = groups.find((y) => y.key === key);
+          if (!g) groups.push((g = { key, rows: [] }));
+          g.rows.push(x);
+        }
+        groups.sort((a, b) => (a.key ? 1 : 0) - (b.key ? 1 : 0));  // 没编号的（整张图共用的）放最前面
+        const head = (key) => key ? '<tr class="fl-panel"><th colspan="3"><span>' + PR.esc(b.num ? PR.t("图 {n}({p})", { n: b.num, p: key }) : "(" + key + ")") + "</span></th></tr>" : "";
         imageText = '<div class="figure-translation fig-labels"><div class="figure-translation-label">' + PR.t("图内文字") + ask + "</div><table>" +
-          labels.map((x) => "<tr><th>" + PR.esc(PR.FIG_ROLE[x.role] || PR.FIG_ROLE.label) + '</th><td class="fl-zh">' + PR.md(x.zh || "", { cite: false, xref: false }) +
-            '</td><td class="fl-en" lang="en">' + PR.md(x.en || "", { cite: false, xref: false }) + "</td></tr>").join("") + "</table></div>";
+          groups.map((g) => head(g.key) + g.rows.map(row).join("")).join("") + "</table></div>";
       } else if (b.image_zh || b.image_en) {
         imageText = '<div class="figure-translation"><div class="figure-translation-label">' + PR.t("图内文字") + ask + '</div>' + zhDiv(key) + enIfZh(key, b.image_en) + '</div>';
       } else if (ask) {

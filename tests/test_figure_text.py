@@ -20,6 +20,20 @@ class NormalizeTest(unittest.TestCase):
         self.assertEqual(figure_text.joined(labels, "zh"), "年份；累積異常報酬（%）；A 小圖")
 
 
+class PanelTest(unittest.TestCase):
+    def test_sub_figure_numbers_are_normalized(self):
+        self.assertEqual([figure_text._panel(x) for x in ["(g)", "G", "Fig. 3a", "圖 2(b)", "(iv)", "12", "panel x long", ""]],
+                         ["g", "g", "a", "b", "iv", "12", "", ""])
+
+    def test_same_axis_name_in_two_panels_is_kept_twice(self):
+        labels = figure_text.normalize_labels([
+            {"panel": "(a)", "role": "x", "en": "Overpotential (V)", "zh": "過電位 (V)"},
+            {"panel": "(b)", "role": "x", "en": "Overpotential (V)", "zh": "過電位 (V)"},
+            {"panel": "", "role": "legend", "en": "Pt/C", "zh": "Pt/C"},
+        ])
+        self.assertEqual([x.get("panel", "") for x in labels], ["a", "b", ""])
+
+
 class ExtractTest(unittest.TestCase):
     def test_labels_are_written_back_to_the_figure_block(self):
         from PIL import Image

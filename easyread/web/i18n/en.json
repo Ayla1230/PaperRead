@@ -2152,5 +2152,6 @@
   "辨识中…": "Reading…",
   "辨识图内文字（标题、X / Y 轴、图例）": "Read figure text (title, X / Y axes, legend)",
   "这张图正在辨识中": "This figure is already being read",
-  "重新辨识": "Read again"
+  "重新辨识": "Read again",
+  "图 {n}({p})": "Fig. {n}({p})"
 }
