@@ -25,6 +25,7 @@
       { k: "question", label: PR.t("提问"), icon: "question", fn: () => PR.startNote({ anchor: id, kind: "question" }) },
     ];
     if (PR.canChat() && PR.feature("chat")) list.push({ k: "chat", label: PR.chatOpen && PR.chatOpen() ? PR.t("引用到对话") : PR.t("问 AI"), icon: "sparkle", fn: () => PR.chatAsk({ anchor: id }) });
+    if (b.type === "math" && PR.canChat() && PR.feature("chat")) list.push({ k: "explain", label: PR.t("解释公式"), icon: "sparkle", fn: () => PR.explainFormula(id, b.tex) });
     if (hasEn && PR.feature("en")) list.push({ k: "en", label: (PR.originalFirst() && !PR.isBilingual() ? PR.t("译文") : PR.t("原文")), icon: "en", fn: () => PR.toggleEn(id) });
     if (keys.length && PR.feature("edit")) list.push({ k: "edit", label: PR.t("改译文"), icon: "edit", fn: () => { if (PR.originalFirst()) PR.toggleEn(id, true); const zh = PR.$("#b-" + CSS.escape(id) + " .zh[data-key]"); zh && PR.editZh(zh); } });
     if (b.page && PR.feature("pages")) list.push({ k: "page", label: PR.t("PDF p.{page}", { page: b.page }), icon: "page", fn: () => PR.openPage(b.page, id) });

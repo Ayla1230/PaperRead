@@ -322,6 +322,7 @@
       '<span class="dots pen-' + pen + '">' + PR.HL_COLORS.map(([c, name], i) =>
       '<button data-s="highlight" data-color="' + c + '" class="dot-' + c + '" title="' + (pen === "underline" ? PR.t("{color}色下划线", { color: name }) : PR.t("{color}色荧光笔", { color: name })) + (PR.keysOn ? PR.t("（{k}）", { k: i + 1 }) : "") + '"></button>').join("") + "</span>" +
       '<button data-s="note" title="' + PR.t("写笔记（N）") + '">' + PR.icon("note", "sm") + PR.t("笔记") + "</button>" +
+      (hasMath(pendingSel) && PR.canChat && PR.canChat() && PR.feature("chat") ? '<button data-s="explain" title="' + PR.t("让 AI 解释这个公式，答案可以贴成便利贴") + '">' + PR.icon("sparkle", "sm") + PR.t("解释公式") + "</button>" : "") +
       (pendingSel.target === "formula" ? "" : '<button data-s="question" title="' + PR.t("提问（Q）") + '">' + PR.icon("question", "sm") + PR.t("提问") + "</button>" +
         (PR.canChat && PR.canChat() && PR.feature("chat") ? '<button data-s="chat" title="' + PR.t("把这句引用到问 AI（可以引用多段）") + '">' + PR.icon("sparkle", "sm") + (PR.chatOpen && PR.chatOpen() ? PR.t("引用到对话") : PR.t("问 AI")) + "</button>" : "") +
         (pendingSel.side || pendingSel.parts ? "" : '<button data-s="en" title="' + PR.t("看这段英文") + '">' + PR.icon("en", "sm") + PR.t("原文") + "</button>") +
@@ -333,6 +334,16 @@
     bar.style.left = x + "px"; bar.style.top = y + "px";
   }
   function showSelbar() { openSelbar(readSelection()); }
+  /* 选到的地方有公式（点了公式、或拖选范围里有 KaTeX）：选取列多一个“解释公式” */
+  function hasMath(p) {
+    if (!p) return false;
+    if (p.target === "formula" || p.math) return true;
+    const s = getSelection();
+    if (!s || !s.rangeCount || s.isCollapsed) return false;
+    const box = document.createElement("div");
+    box.append(s.getRangeAt(0).cloneContents());
+    return !!box.querySelector(".katex");
+  }
   document.addEventListener("mouseup", (e) => {
     if (e.target.closest && e.target.closest("#selbar, #blockbar")) return;
     const formula = e.target.closest && e.target.closest("#paper .math-body");
@@ -357,6 +368,7 @@
       return;
     }
     if (kind === "chat") { PR.chatAsk({ anchor, quote }); return; }
+    if (kind === "explain") { PR.explainFormula(anchor, quote); return; }
     const pen = PR.prefs.pen === "underline" ? "underline" : "marker";
     color = color || (PR.prefs.penColors || {})[pen] || "yellow";
     if (target === "formula") {

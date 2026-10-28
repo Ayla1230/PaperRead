@@ -365,7 +365,7 @@
   function mineAnnotationLines(item, pick) {
     const d = item.data || {};
     const quote = exportQuoteDetails(item, pick);
-    const noteLabel = d.kind === "question" ? PR.t("我的問題") : PR.t("我的注記");
+    const noteLabel = d.kind === "question" ? PR.t("我的問題") : d.kind === "sticky" ? PR.t("便利貼（{title}）", { title: d.title || PR.t("AI 解答") }) : PR.t("我的注記");
     const lines = [];
     if (quote.formula) {
       lines.push("- **" + quote.label + "**");

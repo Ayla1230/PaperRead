@@ -23,6 +23,7 @@
     notes.forEach((n) => (noteById[n.id] = n));
     for (const n of notes) {
       if (n.kind === "highlight" && !(n.body || "").trim() && PR.editingNote !== n.id) continue;
+      if (n.kind === "sticky") continue;  // 便利贴直接贴在版面上（stickies.js），页边不重复
       // 接受後的智慧標註仍是「我的劃線／筆記」，與手動批註一樣放在右欄。
       push(anchorOf(n.anchor), { src: "mine", side: "right", t: n.created || n.updated || "", data: n });
     }
@@ -57,7 +58,7 @@
     }
     const answered = PR.repliesTo(d.id).length > 0;
     const asking = PR.asking.has(d.id);
-    const lbl = d.kind === "question" ? PR.t("我的问题") + " · " + (answered ? PR.t("已回复") : asking ? PR.t("模型思考中") : PR.t("待回答")) : d.kind === "highlight" ? PR.t("我的划线") : PR.t("我的笔记");
+    const lbl = d.kind === "sticky" ? PR.t("便利贴 · {title}", { title: d.title || PR.t("AI 解答") }) : d.kind === "question" ? PR.t("我的问题") + " · " + (answered ? PR.t("已回复") : asking ? PR.t("模型思考中") : PR.t("待回答")) : d.kind === "highlight" ? PR.t("我的划线") : PR.t("我的笔记");
     const editing = (editingId !== undefined ? editingId : PR.editingNote) === d.id;
     const askLabel = d.kind === "question" ? (answered ? PR.t("追问 AI") : PR.t("让 AI 回答")) : PR.t("让 AI 点评");
     const ask = d.kind !== "highlight" && d.body && PR.canChat && PR.canChat() && PR.feature("chat")

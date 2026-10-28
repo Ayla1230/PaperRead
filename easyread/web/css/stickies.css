@@ -1,0 +1,27 @@
+/* 便利贴：贴在段落旁边的 AI 回答，可拖动（标题栏）、调整大小（右下角）、收起 */
+#paper { position: relative; }
+.sticky-layer { position: absolute; inset: 0 auto auto 0; width: 0; height: 0; z-index: 30; }
+.sticky {
+  --st-bg: #fff6c8; --st-head: #f7e7a1; --st-ink: #3d3622; --st-line: rgba(120, 96, 20, .22);
+  position: absolute; display: flex; flex-direction: column; min-width: 220px; min-height: 44px; max-height: 70vh;
+  background: var(--st-bg); color: var(--st-ink); border-radius: 6px; resize: both; overflow: hidden;
+  box-shadow: 0 1px 0 var(--st-line), 0 8px 22px rgba(60, 45, 10, .16); font: 14px/1.7 var(--sans-zh, system-ui);
+}
+.sticky.collapsed { resize: none; height: auto !important; min-height: 0; }
+.sticky.collapsed .st-body { display: none; }
+.sticky.dragging { opacity: .92; box-shadow: 0 1px 0 var(--st-line), 0 14px 30px rgba(60, 45, 10, .24); }
+.sticky.flash { animation: st-flash .9s ease-out; }
+@keyframes st-flash { 0% { transform: scale(.96); } 40% { transform: scale(1.02); } 100% { transform: none; } }
+.st-head { display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; background: var(--st-head); cursor: grab; user-select: none; touch-action: none; }
+.sticky.dragging .st-head { cursor: grabbing; }
+.st-title { flex: 1; display: inline-flex; align-items: center; gap: 5px; min-width: 0; font: 600 12.5px/1.6 var(--ui, system-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-head button { width: 24px; height: 24px; border-radius: 4px; font: 16px/1 var(--ui, system-ui); color: inherit; opacity: .7; }
+.st-head button:hover { opacity: 1; background: rgba(0, 0, 0, .07); }
+.st-body { flex: 1; overflow: auto; padding: 8px 12px 12px; }
+.st-body p { margin: 0 0 .55em; }
+.st-body p:last-child { margin-bottom: 0; }
+.st-body ul, .st-body ol { margin: 0 0 .55em; padding-left: 1.3em; }
+.st-body .katex-display { margin: .4em 0; overflow-x: auto; overflow-y: hidden; }
+:root[data-theme="dark"] .sticky { --st-bg: #3b3622; --st-head: #4a4329; --st-ink: #efe6c4; --st-line: rgba(0, 0, 0, .4); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sticky { --st-bg: #3b3622; --st-head: #4a4329; --st-ink: #efe6c4; --st-line: rgba(0, 0, 0, .4); } }
+@media print { .sticky-layer { display: none; } }

@@ -2182,5 +2182,21 @@
   "快速再加上让模型少思考（API 的推理强度设为 low）。思考也算输出 token，所以通常更快、用量反而更少；复杂公式和表格偶尔可能没那么准。": "Fast, plus less model thinking (API reasoning effort set to low). Thinking counts as output tokens, so this is usually faster and uses less; complex formulas and tables may occasionally be less accurate.",
   "最多同时译 4 段，最省额度。": "Up to 4 sections at once; uses the least quota.",
   "最快": "Fastest",
-  "翻译速度": "Translation speed"
+  "翻译速度": "Translation speed",
+  "AI 解答": "AI answer",
+  "便利貼（{title}）": "Sticky note ({title})",
+  "便利贴 · {title}": "Sticky note · {title}",
+  "先在设置里选一个能问 AI 的模型": "Choose a model for Ask AI in Settings first",
+  "公式解释": "Formula explained",
+  "复原": "Undo",
+  "展开": "Expand",
+  "已拿掉便利贴": "Sticky note removed",
+  "已贴成便利贴，拖标题栏可以移动": "Pinned as a sticky note; drag its title bar to move it",
+  "把这个回答贴在那一段旁边，可以拖动、调整大小": "Pin this answer next to its paragraph; you can drag and resize it",
+  "拖这里移动": "Drag here to move",
+  "拿掉这张便利贴": "Remove this sticky note",
+  "解释公式": "Explain formula",
+  "让 AI 解释这个公式，答案可以贴成便利贴": "Ask AI to explain this formula; the answer can be pinned as a sticky note",
+  "请解释这个公式：每个符号代表什么、它在算什么、直觉上怎么理解，最后用一个简单的数字例子示范怎么算。": "Please explain this formula: what each symbol means, what it computes, the intuition behind it, and finish with a simple numeric example.",
+  "贴成便利贴": "Pin as sticky note"
 }
