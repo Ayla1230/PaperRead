@@ -41,14 +41,31 @@
     return s.replace(saved.inline, (m, i) => raw ? saved.values[i].raw : tokenHtml(saved.values[i], false));
   }
 
+  /* \text{…} 里有 _ 或 ^ 时改成 \mathrm{…}（空格写成 "\ "），其余不动 */
+  PR.fixTex = function (tex) {
+    return String(tex).replace(/\\text\{((?:[^{}]|\{[^{}]*\})*)\}/g, (m, inner) =>
+      /[_^]/.test(inner) ? "\\mathrm{" + inner.replace(/ /g, "\\ ") + "}" : m);
+  };
   PR.tex = function (tex, display) {
     const key = (display ? "D" : "I") + tex;
     if (mathCache.has(key)) return mathCache.get(key);
     let html;
+    const opts = { displayMode: !!display, strict: "ignore", trust: false };
     try {
-      html = katex.renderToString(tex, { displayMode: !!display, throwOnError: false, strict: "ignore", trust: false });
+      html = katex.renderToString(tex, Object.assign({ throwOnError: true }, opts));
     } catch (e) {
-      html = '<code title="' + PR.t("公式渲染失败") + '">' + PR.esc(tex) + "</code>";
+      // 模型常把化学式、单位写进 \text{}（如 0.5\text{ M H_2SO_4}、\text{A mg_{Pt}}^{-1}），
+      // \text 里不能有下标上标，整串就会变成红字原始码。改成 \mathrm 再试一次（空格保留）。
+      const fixed = PR.fixTex(tex);
+      try {
+        html = katex.renderToString(fixed, Object.assign({ throwOnError: true }, opts));
+      } catch (e2) {
+        try {
+          html = katex.renderToString(tex, Object.assign({ throwOnError: false }, opts));
+        } catch (e3) {
+          html = '<code title="' + PR.t("公式渲染失败") + '">' + PR.esc(tex) + "</code>";
+        }
+      }
     }
     mathCache.set(key, html);
     return html;

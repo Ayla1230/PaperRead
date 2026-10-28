@@ -190,6 +190,29 @@
     }
   }
 
+  /* 有些 PDF（Elsevier 等）字元框很“紧”：只从基线到小写字母顶端，框出来像一条线划过字中间。
+     用这一段的行距把每一行的框撑到大约一整行高（往上多撑一些，涵盖大写和上标），已经够高的不动。 */
+  const pitchCache = new Map();
+  function linePitch(id) {
+    const loc = S.layout[id];
+    if (!loc) return 0;
+    if (pitchCache.has(loc)) return pitchCache.get(loc);
+    const ys = [...new Set(Object.values(loc.words || {}).flat().map((w) => Math.round(w[3] * 2000) / 2000))].sort((a, b) => a - b);
+    const gaps = ys.slice(1).map((y, i) => y - ys[i]).filter((g) => g > 0.004 && g < 0.05).sort((a, b) => a - b);
+    const pitch = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
+    pitchCache.set(loc, pitch);
+    return pitch;
+  }
+  function padLines(id, boxes) {
+    const pitch = linePitch(id);
+    return boxes.map(([x0, y0, x1, y1]) => {
+      const h = y1 - y0, want = pitch ? pitch * 0.92 : h;  // 算不出行距就不撑
+      if (h >= want || h <= 0) return [x0, y0, x1, y1];
+      const extra = want - h;
+      return [x0, y0 - extra * 0.68, x1, y1 + extra * 0.32];
+    });
+  }
+
   /* ---------- 逐句对应：左边指着哪一句，原页就框哪一句（layout.json 的 snts 是每句逐行的框） ---------- */
   let sentShown = null;  // { id, key, i }
   const sentBoxes = (id, key, i) => { const l = S.layout[id]; return (l && l.snts && l.snts[key] && l.snts[key][i]) || null; };
@@ -213,7 +236,7 @@
     const entry = pageNodes[loc.page - 1];
     PR.$$(".pv-region.sent", entry.hl).forEach((n) => n.remove());
     PR.$$(".pv-region", entry.hl).forEach((n) => n.classList.add("dim"));
-    boxes.forEach(([x0, y0, x1, y1]) => {
+    padLines(id, boxes).forEach(([x0, y0, x1, y1]) => {
       const region = document.createElement("div");
       region.className = "pv-region sent";
       Object.assign(region.style, { left: (x0 * 100 - 0.3) + "%", top: (y0 * 100 - 0.25) + "%", width: ((x1 - x0) * 100 + 0.6) + "%", height: ((y1 - y0) * 100 + 0.5) + "%" });
@@ -254,7 +277,7 @@
     const entry = pageNodes[loc.page - 1];
     PR.pvUnmark(cls);
     PR.$$(".pv-region:not(.sent):not(.word):not(.line):not(.sel)", entry.hl).forEach((n) => n.classList.add("dim"));
-    boxes.forEach(([x0, y0, x1, y1]) => {
+    padLines(id, boxes).forEach(([x0, y0, x1, y1]) => {
       const region = document.createElement("div");
       region.className = "pv-region " + cls;
       Object.assign(region.style, { left: (x0 * 100 - 0.2) + "%", top: (y0 * 100 - 0.2) + "%", width: ((x1 - x0) * 100 + 0.4) + "%", height: ((y1 - y0) * 100 + 0.4) + "%" });
