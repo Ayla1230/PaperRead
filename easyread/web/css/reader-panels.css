@@ -66,6 +66,11 @@ body.resizing .side-panel { transition: none; }
 .pv-hl.on { opacity: 1; }
 /* 逐句对应：原页上这一句用蓝框，所在段落的黄框变淡；左边对应的原文、译文句子同色底 */
 .pv-region.dim { background: rgba(236, 196, 92, .08); box-shadow: 0 0 0 1px rgba(214, 160, 40, .3); }
+/* 逐字逐行：行（淡黄底线）、词（实心黄）、选取（蓝） */
+.pv-region.line { background: rgba(236, 196, 92, .18); box-shadow: none; border-radius: 2px; border-bottom: 2px solid rgba(214, 160, 40, .8); }
+.pv-region.word { background: rgba(214, 160, 40, .45); box-shadow: 0 0 0 1px rgba(180, 130, 20, .8); border-radius: 2px; }
+.pv-region.sel { background: rgba(74, 130, 195, .32); box-shadow: none; border-radius: 1px; }
+::highlight(pv-word) { background-color: rgba(214, 160, 40, .4); }
 .pv-region.sent { background: rgba(74, 130, 195, .22); box-shadow: 0 0 0 1.5px rgba(74, 130, 195, .75); border-radius: 2px; }
 body.pv-open #paper .snt.pv-snt { background: rgba(74, 130, 195, .14); box-shadow: 0 0 0 2px rgba(74, 130, 195, .14); border-radius: 3px; }
 :root[data-theme="dark"] body.pv-open #paper .snt.pv-snt { background: rgba(110, 160, 214, .2); box-shadow: 0 0 0 2px rgba(110, 160, 214, .2); }

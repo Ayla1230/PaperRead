@@ -36,6 +36,7 @@
       PR.$(".bar-section").innerHTML = h ? PR.esc(h.num ? h.num + " " : "") + PR.titleHtml(PR.textFor(h.id) || h.zh) : "";
       PR.syncPage(false);
     } else if (PR.syncSentence) PR.syncSentence();  // 同一段里往下读：原页的框跟着换到下一句
+    if (PR.followLine) PR.followLine();  // 看得到英文时，原页再标出阅读线上的那一行
     PR.saveProgress && PR.saveProgress();
   }, 120);
 

@@ -117,7 +117,7 @@ def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 
 
 _MATH = re.compile(r"\$[^$]*\$")
 _ALNUM = re.compile(r"[a-z0-9]")
-LOCATE_VERSION = "7"  # 从上一页接过来的段落也找得到；每句话记下逐行的框（snts）；旧论文打开时重算。
+LOCATE_VERSION = "8"  # 从上一页接过来的段落也找得到；每句（snts）、每个英文词（words）记下原页上的框；旧论文打开时重算。
 
 
 def _norm(s: str) -> str:
@@ -236,6 +236,60 @@ def _sentence_boxes(text: str, idx, chars, a: int, end: int, en: str, sents) -> 
         nxt = next((x for x in starts[i + 1:] if x > start), end + 1)
         out.append(_line_boxes(chars, idx, start, nxt - 1) or None)
     return out if any(out) else None
+
+
+_WORD = re.compile(r"\S+")
+
+
+def _word_boxes(text: str, idx, chars, a: int, end: int, en: str) -> list:
+    """英文原文每个词在原页上的框：[[词开头, 词结尾, x0, y0, x1, y1], …]。
+    词的位置用“去掉公式后只留英数字”的累计位置表示（页面上用同样的算法从滑鼠位置换算），
+    原页这一段文字和原文逐字对齐（difflib），对不上的字（公式、页眉、上一页的那截）就跳过。
+    一个词断在两行（连字号）时有两个框，开头结尾相同。"""
+    from difflib import SequenceMatcher
+    plain_tokens = [(_norm(m.group(0))) for m in _WORD.finditer(_MATH.sub(" ", en))]
+    plain = "".join(plain_tokens)
+    seg_end = min(len(text), end + 1 + 40)
+    seg = text[a:seg_end]
+    if not plain or not seg:
+        return []
+    page_of = [-1] * len(plain)
+    for block in SequenceMatcher(None, plain, seg, autojunk=False).get_matching_blocks():
+        for k in range(block.size):
+            page_of[block.a + k] = a + block.b + k
+    out, pos = [], 0
+    for tok in plain_tokens:
+        ns, ne = pos, pos + len(tok)
+        pos = ne
+        hits = [page_of[k] for k in range(ns, ne) if page_of[k] >= 0]
+        if not tok or len(hits) * 2 < len(tok):  # 一半以上的字对不上：不框，免得框错地方
+            continue
+        for box in _line_boxes(chars, idx, min(hits), max(hits)):
+            out.append([ns, ne] + box)
+    return out
+
+
+def _words(block: dict, text: str, idx, chars, a: int, end: int) -> dict:
+    """{键: 每个英文词的框}；键和 snts 一样（段落是块 id，列表项是 id#序号）。"""
+    out = {}
+    if block.get("type") == "para" and block.get("en"):
+        got = _word_boxes(text, idx, chars, a, end, block["en"])
+        if got:
+            out[block["id"]] = got
+    elif block.get("type") == "list":
+        pos = a
+        for i, item in enumerate(block.get("items") or []):
+            if not isinstance(item, dict) or not item.get("en"):
+                continue
+            start = _find_start(text[: end + 1], _norm(_MATH.sub(" ", item["en"])), [_anchors(item["en"])[0][:16]], pos)
+            if start < 0:
+                continue
+            nxt = len(_norm(_MATH.sub(" ", item["en"])))
+            got = _word_boxes(text, idx, chars, start, min(end, start + nxt + 20), item["en"])
+            if got:
+                out[f"{block['id']}#{i}"] = got
+            pos = start + 1
+    return out
 
 
 def _snts(block: dict, text: str, idx, chars, a: int, end: int) -> dict:
@@ -360,6 +414,9 @@ def _locate(root: Path) -> dict:
             snts = _snts(block, text, idx, chars, a, end)
             if snts:
                 layout[bid]["snts"] = snts
+            words = _words(block, text, idx, chars, a, end)
+            if words:
+                layout[bid]["words"] = words
             cursor[pn] = end
             break
     _extend_captioned(paper.get("blocks", []), layout, root)

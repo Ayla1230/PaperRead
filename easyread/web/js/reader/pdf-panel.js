@@ -87,8 +87,9 @@
         const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
         node.classList.toggle("pickable", !!blockAt(x, y, i + 1));
         hoverPdfSentence(sentenceAt(x, y, i + 1));
+        if (PR.pdfHoverWord) PR.pdfHoverWord(x, y, i + 1);
       });
-      node.addEventListener("mouseleave", () => hoverPdfSentence(null));
+      node.addEventListener("mouseleave", () => { hoverPdfSentence(null); if (PR.pdfHoverWord) PR.pdfHoverWord(null); });
       return { node, img, hl };
     });
     scroller.replaceChildren(...pageNodes.map(p => p.node));
@@ -242,6 +243,37 @@
     PR.$$(".pv-region.sent", entry.hl).forEach((n) => n.remove());
     PR.$$(".pv-region.dim", entry.hl).forEach((n) => n.classList.remove("dim"));
   };
+  /* ---------- 给 pdf-words.js 用：在原页上画某一类框（word 词 / line 行 / sel 选取） ---------- */
+  PR.pvMark = function (id, boxes, cls, scroll) {
+    if (PR.side !== "pages") return false;
+    const loc = S.layout[id];
+    if (!loc || !boxes || !boxes.length) { PR.pvUnmark(cls); return false; }
+    if (pvBlock !== id || !pageNodes[loc.page - 1] || !pageNodes[loc.page - 1].hl.classList.contains("on")) {
+      pvBlock = id; pvPage = loc.page; ensurePages(); loadNearby(pvPage); updatePageLabel(); highlightBlock(pvPage, id);
+    }
+    const entry = pageNodes[loc.page - 1];
+    PR.pvUnmark(cls);
+    PR.$$(".pv-region:not(.sent):not(.word):not(.line):not(.sel)", entry.hl).forEach((n) => n.classList.add("dim"));
+    boxes.forEach(([x0, y0, x1, y1]) => {
+      const region = document.createElement("div");
+      region.className = "pv-region " + cls;
+      Object.assign(region.style, { left: (x0 * 100 - 0.2) + "%", top: (y0 * 100 - 0.2) + "%", width: ((x1 - x0) * 100 + 0.4) + "%", height: ((y1 - y0) * 100 + 0.4) + "%" });
+      entry.hl.append(region);
+    });
+    entry.hl.classList.add("on");
+    if (scroll) {
+      const top = pageTop(entry.node) + Math.min(...boxes.map((b) => b[1])) * entry.node.offsetHeight;
+      const bottom = pageTop(entry.node) + Math.max(...boxes.map((b) => b[3])) * entry.node.offsetHeight;
+      const view0 = scroller.scrollTop + 40, view1 = scroller.scrollTop + scroller.clientHeight - 40;
+      if (top < view0 || bottom > view1) {
+        panelInput = false; programmaticUntil = Date.now() + 1200;
+        scroller.scrollTo({ top: Math.max(0, (top + bottom) / 2 - scroller.clientHeight * 0.4), behavior: "smooth" });
+      }
+    }
+    return true;
+  };
+  PR.pvUnmark = function (cls) { PR.$$(".pv-region." + cls, scroller).forEach((n) => n.remove()); };
+
   /* 原页上滑过某一句 → 左边对应的那句（原文和译文）一起亮 */
   function sentenceAt(x, y, page) {
     for (const id in S.layout) {

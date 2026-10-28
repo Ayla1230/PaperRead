@@ -63,6 +63,21 @@ class SentenceLayoutTest(unittest.TestCase):
         self.assertEqual(len(snts), 3)
         self.assertTrue(all(snts))  # 第一句只有後半在這頁，也要框得到
 
+    def test_each_english_word_gets_a_box_in_reading_order(self):
+        en = "Attitude had the strongest effect on intention, while $\\beta$ was 0.42 for subjective norm."
+        self.page(1, en.replace("$\\beta$", "β"))
+        write_json_atomic(self.root / "paper.json", {"blocks": [{"id": "p1-1", "page": 1, "type": "para", "en": en}]})
+        words = pdfwork.locate(self.root)["p1-1"]["words"]["p1-1"]
+        starts = [w[0] for w in words]
+        self.assertEqual(starts, sorted(starts))
+        first = words[0]
+        self.assertEqual(first[:2], [0, len("attitude")])
+        # 词的框落在原页同一行上，而且第一个词从左边开始
+        self.assertAlmostEqual(first[2], 0.1, places=2)
+        # 公式不算在累计位置里：word 'was' 紧接在 'while' 之后
+        plain = [w for w in words if w[1] - w[0] == 3]
+        self.assertTrue(plain)
+
     def test_unmatched_text_block_gets_no_guessed_box(self):
         self.page(1, "Completely different words appear on this page of the document. " * 2)
         write_json_atomic(self.root / "paper.json", {"blocks": [
