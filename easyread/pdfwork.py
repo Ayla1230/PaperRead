@@ -117,7 +117,7 @@ def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 
 
 _MATH = re.compile(r"\$[^$]*\$")
 _ALNUM = re.compile(r"[a-z0-9]")
-LOCATE_VERSION = "8"  # 从上一页接过来的段落也找得到；每句（snts）、每个英文词（words）记下原页上的框；旧论文打开时重算。
+LOCATE_VERSION = "9"  # 从上一页接过来的段落也找得到；每句（snts）、每个英文词（words）记下原页上的框；旧论文打开时重算。
 
 
 def _norm(s: str) -> str:
@@ -316,6 +316,10 @@ def _snts(block: dict, text: str, idx, chars, a: int, end: int) -> dict:
 
 
 def _find_start(text: str, plain: str, heads: list[str], since: int = 0) -> int:
+    return _find_start_skip(text, plain, heads, since)[0]
+
+
+def _find_start_skip(text: str, plain: str, heads: list[str], since: int = 0) -> tuple[int, int]:
     """段落开头在这页文字里的位置；找不到返回 -1。
     先用开头几个字找；找不到时（段落是从上一页接过来的，开头那几个字在上一页；或模型把跨页的字重复了一次），
     改用段落里往后的片段找，对上了再往前一个字一个字比对，退到这页上真正的开头。"""
@@ -326,9 +330,9 @@ def _find_start(text: str, plain: str, heads: list[str], since: int = 0) -> int:
         if a < 0:
             a = text.find(h)
         if a >= 0:
-            return a
+            return a, 0
     if len(plain) < 48:
-        return -1
+        return -1, 0
     for o in range(6, min(len(plain) - 28, 480), 6):
         probe = plain[o:o + 28]
         a = text.find(probe, since)
@@ -339,8 +343,8 @@ def _find_start(text: str, plain: str, heads: list[str], since: int = 0) -> int:
         k = 0
         while a - k - 1 >= 0 and o - k - 1 >= 0 and text[a - k - 1] == plain[o - k - 1]:
             k += 1
-        return a - k
-    return -1
+        return a - k, o - k
+    return -1, 0
 
 
 def block_english(block: dict) -> str:
@@ -402,15 +406,23 @@ def _locate(root: Path) -> dict:
             if not st:
                 continue
             text, idx, chars = st
-            a = _find_start(text, plain, heads, cursor.get(pn, 0) if pn == page else 0)
+            a, skipped = _find_start_skip(text, plain, heads, cursor.get(pn, 0) if pn == page else 0)
             if a < 0:
                 continue
-            b = text.find(tail, a) if tail else -1
-            end = b + len(tail) - 1 if b >= 0 else min(a + len(_norm(block_english(block))), len(idx) - 1)
+            # 段落结尾：同样的结尾字串可能出现好几次（学术文章常重复同一句型），取最接近“开头 + 段落长度”的那一个
+            expect = a + len(plain) - skipped - 1
+            b, hit = -1, (text.find(tail, a) if tail else -1)
+            while hit >= 0:
+                if b < 0 or abs(hit + len(tail) - 1 - expect) < abs(b + len(tail) - 1 - expect):
+                    b = hit
+                hit = text.find(tail, hit + 1)
+            end = b + len(tail) - 1 if b >= 0 else min(a + len(plain) - skipped, len(idx) - 1)
             boxes = _boxes(chars, idx, a, end)
             layout[bid] = {"page": pn, "box": _bounds(boxes), "src": "text" if b >= 0 else "head"}
             if len(boxes) > 1:
                 layout[bid]["boxes"] = boxes
+            if block.get("type") in ("figure", "table"):
+                layout[bid]["cap"] = _bounds(boxes)  # 题注本身的位置；图的区域之后会往外扩，裁图时要把题注切掉
             snts = _snts(block, text, idx, chars, a, end)
             if snts:
                 layout[bid]["snts"] = snts
@@ -428,15 +440,24 @@ def _locate(root: Path) -> dict:
 
 
 def refresh_layout(root: Path) -> None:
-    """沿用上游的版本标记；并发打开同一篇论文时只重算一次。"""
+    """沿用上游的版本标记；并发打开同一篇论文时只重算一次。
+    layout.json 还不存在（翻译当时定位出错，或用命令列直接写进的块）但已经有译好的块时，也补算一次。"""
     with _LAYOUT_LOCK:
         marker = root / "extract" / "locate.version"
-        if not (root / "layout.json").exists() or not (root / "paper.json").exists():
+        if not (root / "paper.json").exists():
             return
         if not any((root / "extract").glob("page-*.chars.json")):
             return
-        if marker.exists() and marker.read_text(encoding="utf-8").strip() == LOCATE_VERSION:
-            return
+        if (root / "layout.json").exists():
+            if marker.exists() and marker.read_text(encoding="utf-8").strip() == LOCATE_VERSION:
+                return
+        else:
+            try:
+                blocks = json.loads((root / "paper.json").read_text(encoding="utf-8")).get("blocks") or []
+            except (OSError, ValueError):
+                return
+            if not blocks:
+                return
         locate(root)
 
 

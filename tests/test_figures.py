@@ -225,5 +225,23 @@ class CropSourceTest(unittest.TestCase):
             figures.crop(self.root, 1, [.1, .1, .6, .6])
 
 
+class DisplayBoxTest(unittest.TestCase):
+    """自动裁图：切掉题注，以及上下边缘带到的一行正文。"""
+
+    def test_caption_and_neighbouring_text_lines_are_trimmed(self):
+        fig = {"page": 1, "box": [0.5, 0.15, 0.9, 0.40], "cap": [0.52, 0.37, 0.90, 0.39]}
+        para = {"page": 1, "box": [0.52, 0.08, 0.90, 0.166], "words": {"p": [[0, 5, 0.52, 0.153, 0.56, 0.166]]}}
+        layout = {"fig1": fig, "p": para}
+        box = figures._display_box(fig["box"], fig, layout, 1)
+        self.assertGreaterEqual(box[1], 0.166)   # 上面那行正文切掉了
+        self.assertLess(box[1], 0.168)           # 但没有吃进图
+        self.assertLessEqual(box[3], 0.37)       # 题注切掉了
+
+    def test_words_inside_the_middle_of_the_figure_are_left_alone(self):
+        fig = {"page": 1, "box": [0.1, 0.2, 0.9, 0.6]}
+        other = {"page": 1, "box": [0.1, 0.3, 0.9, 0.4], "words": {"p": [[0, 3, 0.2, 0.39, 0.25, 0.40]]}}
+        self.assertEqual(figures._display_box(fig["box"], fig, {"f": fig, "p": other}, 1), [0.1, 0.2, 0.9, 0.6])
+
+
 if __name__ == "__main__":
     unittest.main()

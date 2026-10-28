@@ -126,6 +126,32 @@ def prepare_figures(root, blocks: list[dict], total_pages: int) -> None:
             log.exception("截图失败 %s 第 %s 页", block.get("id"), page)
 
 
+def _display_box(box: list[float], loc: dict, layout: dict, page: int) -> list[float] | None:
+    """自动裁图的范围（layout 里图的区域）包含题注，四周还留了一点边，常会带到题注和上下正文的一行字。
+    题注在译文里另外显示，正文也在旁边：把这些从图片里切掉。"""
+    x0, y0, x1, y1 = box
+    cap = figure_box(loc.get("cap")) if loc.get("cap") else None
+    if cap and cap[0] < x1 and cap[2] > x0 and cap[1] < y1 and cap[3] > y0:
+        if (cap[1] + cap[3]) / 2 > (y0 + y1) / 2:
+            y1 = min(y1, cap[1] - 0.004)   # 题注在下面
+        else:
+            y0 = max(y0, cap[3] + 0.004)   # 题注在上面
+    band = (y1 - y0) * 0.15
+    for other in layout.values():
+        if other is loc or other.get("page") != page:
+            continue
+        for words in (other.get("words") or {}).values():
+            for w in words:
+                wx0, wy0, wx1, wy1 = w[2:6]
+                if wx1 <= x0 or wx0 >= x1 or wy1 <= y0 or wy0 >= y1:
+                    continue
+                if wy0 < y0 + band:
+                    y0 = max(y0, wy1 + 0.0003)  # 上一段正文的最后一行（只切到字的下缘，不吃进图）
+                elif wy1 > y1 - band:
+                    y1 = min(y1, wy0 - 0.0003)  # 下一段正文的第一行
+    return figure_box([x0, y0, x1, y1])
+
+
 def _pending(ws):
     """没有截图或自动裁剪范围已变化的图块；保留显式 box 和自定义 src。"""
     layout = ws.load("layout") or {}
@@ -139,6 +165,7 @@ def _pending(ws):
         page = loc.get("page")
         if not box or not isinstance(page, int) or page < 1:
             continue
+        box = _display_box(box, loc, layout, page) or box
         x0, y0, x1, y1 = box
         if x1 - x0 < 0.05 or y1 - y0 < 0.03:  # 只匹配到一行题注、没撑开的框截出来没用
             continue
