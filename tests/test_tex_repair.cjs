@@ -28,3 +28,9 @@ test("plain \\text without sub/superscripts is left untouched", () => {
   const PR = load();
   assert.equal(PR.fixTex("\\text{ mA cm}^{-2}"), "\\text{ mA cm}^{-2}");
 });
+
+test("a superscript after the text is stacked with the subscript, like the original PDF", () => {
+  const PR = load();
+  assert.equal(PR.fixTex("2.16\\text{ A mg_{Pt}}^{-1}"), "2.16\\mathrm{\\ A\\ mg_{Pt}^{-1}}");
+  assert.equal(PR.fixTex("\\text{ M H_2SO_4}"), "\\mathrm{\\ M\\ H_2SO_4}");
+});

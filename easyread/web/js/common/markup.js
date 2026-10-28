@@ -43,8 +43,12 @@
 
   /* \text{…} 里有 _ 或 ^ 时改成 \mathrm{…}（空格写成 "\ "），其余不动 */
   PR.fixTex = function (tex) {
-    return String(tex).replace(/\\text\{((?:[^{}]|\{[^{}]*\})*)\}/g, (m, inner) =>
-      /[_^]/.test(inner) ? "\\mathrm{" + inner.replace(/ /g, "\\ ") + "}" : m);
+    // 后面紧跟的上标（\text{ A mg_{Pt}}^{-1}）搬进来接在下标后面，才会像原文那样把 Pt 和 −1 上下叠在 mg 右边
+    return String(tex).replace(/\\text\{((?:[^{}]|\{[^{}]*\})*)\}(\^(?:\{[^{}]*\}|[^\s{}\\]))?/g, (m, inner, sup) => {
+      if (!/[_^]/.test(inner)) return m;
+      const stack = sup && /_(?:\{[^{}]*\}|\w)$/.test(inner);
+      return "\\mathrm{" + inner.replace(/ /g, "\\ ") + (stack ? sup : "") + "}" + (sup && !stack ? sup : "");
+    });
   };
   PR.tex = function (tex, display) {
     const key = (display ? "D" : "I") + tex;

@@ -20,6 +20,7 @@ def _target_prompt(text: str, target: str) -> str:
     return _tw_prompt(text) if target == "zh-TW" else text
 
 MATH_RULES = r"""- 行内数学一律写成 $TeX$（KaTeX 能渲染的 LaTeX）：即使只有一个变量，也必须有成对的 $；变量、下标、上标都用 TeX，不要直接照抄 PDF 抽取出的散乱字符或用 Unicode 拼。
+- 化学式和单位照原文的上下标写在公式里，用 \mathrm：$0.5\ \mathrm{M\ H_2SO_4}$、$2.16\ \mathrm{A\ mg_{Pt}^{-1}}$、$10\ \mathrm{mA\ cm^{-2}}$；下标和上标写在同一个字后面才会上下对齐。不要把 _ 或 ^ 放进 \text{}（那样显示不出来）。
 - en 和 zh、标题、列表、表头、单元格、图内文字及题注都遵守同一公式规则。例如：原文 "Let $x_i \in \mathbb{R}^d$."，译文 "令 $x_i \in \mathbb{R}^d$。"；不要输出裸露的 x_i、\alpha 或 \frac{a}{b}，不要把整句正文包进 $。
 - 行间公式单独成 math 块，tex 只放公式内容（不带 $、$$ 或 \[\]），照原页保留上下标、分式、矩阵和运算符，原编号放 tag。看不清时标明待核对，不猜公式。
 - 代码围栏、行内代码、路径和网址保持原样，不为其中的符号添加数学定界符；普通金额的美元符号写成 \$。输出前逐项检查公式是否有定界符、是否成对，JSON 中的 TeX 反斜杠必须写两个。"""
