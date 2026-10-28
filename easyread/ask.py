@@ -139,6 +139,7 @@ def glossary_hits(lib, text: str, limit: int = GLOSSARY_HITS) -> list[dict]:
 
 
 # ---------- 附上的论文 ----------
+_SPACES = re.compile(r"[ \t]+")
 _PLACEHOLDER_TITLES = {"", "(anonymous)", "untitled", "microsoft word", "untitled document"}
 
 
@@ -191,7 +192,8 @@ def paper_text(lib, pid: str, budget: int = PAPER_BUDGET) -> tuple[str, dict]:
     if not ws:
         return "", {}
     pages = _pages_from_extract(ws) or _pages_from_pdf(ws)
-    parts = [f"〔第 {n} 頁〕\n{re.sub(r'[ \t]+', ' ', t).strip()}" for n, t in pages if t and t.strip()]  # i18n-ok: 给模型的页码标记
+    # Python 3.10/3.11 的 f-string 大括号里不能有反斜线，先整理好再放进去
+    parts = [f"〔第 {n} 頁〕\n{_SPACES.sub(' ', t).strip()}" for n, t in pages if t and t.strip()]  # i18n-ok: 给模型的页码标记
     text = "\n\n".join(parts)
     info = {"pages": len(pages), "chars": len(text), "truncated": False}
     if len(text) > budget:
