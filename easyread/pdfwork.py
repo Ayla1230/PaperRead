@@ -117,7 +117,7 @@ def crop(root: Path, page: int, box: list[float], out_name: str, scale: float = 
 
 _MATH = re.compile(r"\$[^$]*\$")
 _ALNUM = re.compile(r"[a-z0-9]")
-LOCATE_VERSION = "9"  # 从上一页接过来的段落也找得到；每句（snts）、每个英文词（words）记下原页上的框；旧论文打开时重算。
+LOCATE_VERSION = "10"  # 模型给框的图也改用 PDF 图形边界（v1.6.7）； 从上一页接过来的段落也找得到；每句（snts）、每个英文词（words）记下原页上的框；旧论文打开时重算。
 
 
 def _norm(s: str) -> str:
@@ -420,9 +420,26 @@ def _locate_block(block: dict, layout: dict, cursor: dict, stream, page_text, to
     bid, page = block.get("id"), block.get("page")
     if not bid or not page:
         return
+    hint = None
     if block.get("box"):
-        layout[bid] = {"page": page, "box": block["box"], "src": "manual"}
-        return
+        if block.get("type") == "figure" and _anchors(block_english(block))[0]:
+            hint = block["box"]  # 模型估的图框常偏（切掉图的一边、带到页眉和下一行正文）：先找题注、用 PDF 图形边界，找不到才用它
+        else:
+            layout[bid] = {"page": page, "box": block["box"], "src": "manual"}
+            return
+    try:
+        _locate_text(block, layout, cursor, stream, page_text, total, detail)
+    finally:
+        if hint:
+            if bid in layout:
+                layout[bid]["hint"] = hint
+            else:
+                layout[bid] = {"page": page, "box": hint, "src": "manual"}
+
+
+def _locate_text(block: dict, layout: dict, cursor: dict, stream, page_text, total: int, detail: bool) -> None:
+    """按块的英文（图表是题注）在原页文字里找位置。"""
+    bid, page = block.get("id"), block.get("page")
     head, tail = _anchors(block_english(block))
     if not head:
         return
@@ -525,7 +542,13 @@ def _extend_captioned(blocks: list[dict], layout: dict, root: Path | None = None
         if block["id"] in visual:
             loc["box"] = visual[block["id"]]
             loc.pop("boxes", None)
+            loc.pop("hint", None)
             loc["src"] = "graphic"
+            continue
+        if loc.get("hint"):  # 找到题注、但认不出图形边界：用模型的框，题注位置留着给裁图时切掉
+            loc["box"] = loc.pop("hint")
+            loc.pop("boxes", None)
+            loc["src"] = "manual"
             continue
         x0, y0, x1, y1 = loc["box"]
         others = [l for l in _page_locs(layout, loc["page"]) if l["_parent"] is not loc]

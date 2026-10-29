@@ -127,6 +127,26 @@ class FigureTest(unittest.TestCase):
         self.assertEqual(blocks["fig2"]["src"], "")
         self.assertEqual(figures.missing(ws), [])
 
+    def test_model_box_is_replaced_by_detected_graphic_bounds(self):
+        # 模型估的框切掉了图的右边、又带到页眉和下一行正文；原页上认出图形边界后要改用它重截
+        ws = Workspace(self.root)
+        fig = {"id": "fig1", "type": "figure", "page": 1, "box": [.08, .03, .62, .5], "src": "figures/crop-1-old.webp", "caption_en": "Figure 1"}
+        write_json_atomic(self.root / "paper.json", {"meta": {"page_count": 2}, "blocks": [fig]})
+        write_json_atomic(self.root / "layout.json", {"fig1": {"page": 1, "box": [.1, .1, .9, .46], "cap": [.1, .41, .7, .45], "src": "graphic"}})
+        [(bid, page, box)] = figures.missing(ws)
+        self.assertEqual((bid, page), ("fig1", 1))
+        self.assertAlmostEqual(box[2], .9)            # 右边不再被切掉
+        self.assertLess(box[3], .41)                  # 题注切掉（题注另外显示）
+        self.assertEqual(figures.fill(ws), 1)
+        self.assertEqual(figures.missing(ws), [])     # 重截后就不再重复截
+
+    def test_model_box_without_caption_match_is_kept(self):
+        ws = Workspace(self.root)
+        fig = {"id": "fig1", "type": "figure", "page": 1, "box": [.1, .1, .6, .5], "src": "figures/crop-1-old.webp", "caption_en": "Figure 1"}
+        write_json_atomic(self.root / "paper.json", {"meta": {"page_count": 2}, "blocks": [fig]})
+        write_json_atomic(self.root / "layout.json", {"fig1": {"page": 1, "box": [.1, .1, .6, .5], "src": "manual"}})
+        self.assertEqual(figures.missing(ws), [])
+
     def test_image_translation_missing_even_when_caption_is_done(self):
         b = self.figure()
         b["caption_zh"] = "done"

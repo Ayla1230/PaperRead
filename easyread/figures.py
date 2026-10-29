@@ -172,9 +172,11 @@ def _pending(ws):
     out = []
     for b in (ws.load("paper") or {}).get("blocks", []):
         src = b.get("src", "")
-        if b.get("type") != "figure" or src and (b.get("box") or not src.startswith("figures/crop-")):
-            continue
         loc = layout.get(b.get("id")) or {}
+        # 模型给了框的图：原页上认出了图形边界（graphic），或至少找到题注（manual + cap）时，改用校正后的范围重截
+        refine = b.get("box") and loc.get("cap") and loc.get("src") in ("graphic", "manual")
+        if b.get("type") != "figure" or src and not refine and (b.get("box") or not src.startswith("figures/crop-")):
+            continue
         box = figure_box(loc.get("box"))
         page = loc.get("page")
         if not box or not isinstance(page, int) or page < 1:
