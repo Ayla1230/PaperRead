@@ -173,6 +173,8 @@
       const label = "<sup>" + n + "</sup>";
       return id ? '<a class="footnote-ref" href="#b-' + PR.esc(id) + '" data-footnote="b-' + PR.esc(id) + '">' + label + "</a>" : label;
     });
+    // 模型偶尔把注脚号写成 ^47（不是 [^47]）：排成上标，不要露出 ^ 记号
+    s = s.replace(/([^\s\\^\w$]|[a-zA-Z\u4e00-\u9fff。，．.)）」”'"])\^(\d{1,3})(?![\d^])/g, "$1<sup>$2</sup>");
     if (opts.cite !== false) s = citeLinks(s);
     if (opts.xref !== false) s = xrefLinks(s);
     return s.replace(/\n/g, "<br>");
