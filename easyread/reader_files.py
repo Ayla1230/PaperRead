@@ -15,6 +15,10 @@ def refresh_layout(ws) -> None:
     if (ws.load("job") or {}).get("state") in ("queued", "running"):
         return
     try:
+        extract_dir = ws.root / "extract"
+        if (ws.root / "paper.json").exists() and not any(extract_dir.glob("page-*.chars.json")) and (ws.load("paper") or {}).get("blocks"):
+            # 旧论文或连结的 PDF 缺每页的文字位置资料：重抽一次，不然右边的原页永远跟随不了
+            pdfwork.extract_text(ws.source_pdf, extract_dir)
         pdfwork.refresh_layout(ws.root)
     except Exception:  # noqa: BLE001
         log.exception("重算原页定位失败 %s", ws.root)

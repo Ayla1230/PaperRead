@@ -2236,5 +2236,14 @@
   "显著性说明": "Significance notes",
   "请 AI 白话解释这段结果": "Ask AI to explain these results in plain words",
   "请用白话解释这段的统计结果：每个系数和 p 值代表什么、哪些显著、哪些不显著，实际意义是什么。": "Please explain this paragraph's statistical results in plain words: what each coefficient and p-value means, which are significant and which are not, and what they mean in practice.",
-  "，{dir}": ", {dir}"
+  "，{dir}": ", {dir}",
+  "已对上 {a} / {b} 段": "Matched {a} / {b} paragraphs",
+  "正在重新计算每段在原页上的位置…": "Recomputing where each paragraph sits on the original pages…",
+  "翻译还在进行，译完会自动对位": "Translation is still running; positions are matched automatically when it finishes",
+  "还是对不上：原文和 PDF 的文字差太多。请截图回报，附上论文名称。": "Still no match: the text differs too much from the PDF. Please report this with a screenshot and the paper's title.",
+  "这份 PDF 读不到文字（可能是扫描档或特殊字型），所以右边无法逐段跟随；翻页仍然可以用。": "This PDF has no readable text (it may be scanned or use unusual fonts), so the right side can't follow paragraphs; paging still works.",
+  "这段在原页上还没对上位置（全篇 {a} / {b} 段有位置）": "This paragraph has no position on the original page yet ({a} / {b} paragraphs have positions)",
+  "这篇还没有原页位置资料，所以右边无法跟随": "This paper has no page-position data yet, so the right side can't follow",
+  "重新对位": "Re-match positions",
+  "重新对位失败：{msg}": "Re-matching failed: {msg}"
 }

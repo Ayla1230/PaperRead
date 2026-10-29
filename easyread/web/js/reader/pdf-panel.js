@@ -152,7 +152,47 @@
     if (panelInput) followPanel(entry, middle);
   }, { passive: true });
 
+  /* 这段在原页上没有位置（旧论文、文字层读不到、算的时候出错）：面板上方提示，可以按“重新对位”重算 */
+  const TEXT_TYPES = ["para", "heading", "list"];
+  function hint(blockId, page) {
+    const box = PR.$(".pv-hint");
+    if (!box) return;
+    const b = blockId && PR.blockById[blockId], loc = blockId && S.layout[blockId];
+    const missing = b && TEXT_TYPES.includes(b.type) && (!loc || loc.page !== page);
+    if (!missing || hint.busy) { if (!hint.busy) box.hidden = true; return; }
+    const ids = (S.paper.blocks || []).filter((x) => TEXT_TYPES.includes(x.type) && x.page).map((x) => x.id);
+    const found = ids.filter((id) => S.layout[id]).length;
+    box.innerHTML = "<span>" + (found ? PR.t("这段在原页上还没对上位置（全篇 {a} / {b} 段有位置）", { a: found, b: ids.length }) : PR.t("这篇还没有原页位置资料，所以右边无法跟随")) + "</span>" +
+      (PR.store.mode === "server" ? '<button class="btn sm line" data-pv-relocate>' + PR.t("重新对位") + "</button>" : "");
+    box.hidden = false;
+  }
+  PR.$("#pageview").addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-pv-relocate]");
+    if (!btn) return;
+    const box = PR.$(".pv-hint");
+    hint.busy = true;
+    box.innerHTML = '<span class="spin"></span> <span>' + PR.t("正在重新计算每段在原页上的位置…") + "</span>";
+    try {
+      const r = await PR.api("/api/p/" + PR.pid + "/relocate", { method: "POST", body: {} });
+      S.layout = r.layout || {};
+      hint.busy = false;
+      const cur = PR.currentBlock && PR.currentBlock();
+      if (r.located) {
+        box.hidden = true;
+        PR.toast(PR.t("已对上 {a} / {b} 段", { a: r.located, b: r.total }));
+        if (cur && S.layout[cur]) showPage(S.layout[cur].page, cur); else highlightBlock(pvPage, cur);
+        if (cur && (!S.layout[cur] || S.layout[cur].page !== pvPage)) hint(cur, pvPage);
+      } else {
+        box.innerHTML = "<span>" + (r.text_layer ? PR.t("还是对不上：原文和 PDF 的文字差太多。请截图回报，附上论文名称。") : PR.t("这份 PDF 读不到文字（可能是扫描档或特殊字型），所以右边无法逐段跟随；翻页仍然可以用。")) + "</span>";
+      }
+    } catch (err) {
+      hint.busy = false;
+      box.innerHTML = "<span>" + PR.t("重新对位失败：{msg}", { msg: PR.esc(PR.errorText ? PR.errorText(err) : err.message) }) + "</span>";
+    }
+  });
+
   function highlightBlock(page, blockId) {
+    hint(blockId, page);
     sentShown = null;
     pageNodes.forEach(p => p.hl.classList.remove("on"));
     const hl = pageNodes[page - 1].hl;

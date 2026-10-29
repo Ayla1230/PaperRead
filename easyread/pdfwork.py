@@ -401,59 +401,11 @@ def _locate(root: Path, detail: bool = True) -> dict:
     layout: dict[str, dict] = {}
     cursor: dict[int, int] = {}
     for block in paper.get("blocks", []):
-        bid, page = block.get("id"), block.get("page")
-        if not bid or not page:
-            continue
-        if block.get("box"):
-            layout[bid] = {"page": page, "box": block["box"], "src": "manual"}
-            continue
-        head, tail = _anchors(block_english(block))
-        if not head:
-            continue
-        heads = [head]
-        if block.get("type") == "heading" and block.get("num"):
-            heads.insert(0, _anchors(f"{block['num']} {block.get('en', '')}")[0])
-        # 模型给的页码偶尔会错（跨页的段落、没认出页眉的页）：先找它说的那页和下一页，
-        # 找不到再往前后各页找。远处的页只认够长的开头，免得短句子撞到别处的同样字词。
-        plain = _norm(_MATH.sub(" ", block_english(block)))
-        near = (page, page + 1)
-        far = sorted((n for n in range(1, total + 1) if n not in near), key=lambda n: (abs(n - page), n))
-        for pn in near + tuple(far):
-            if pn not in near:
-                if len(plain) < 20:
-                    break  # 太短的字在别页很容易撞到一样的，不往远处找
-                if _find_start(page_text(pn), plain, [head if len(head) >= 20 else ""]) < 0:
-                    continue
-            st = stream(pn)
-            if not st:
-                continue
-            text, idx, chars = st
-            a, skipped = _find_start_skip(text, plain, heads, cursor.get(pn, 0) if pn == page else 0)
-            if a < 0:
-                continue
-            # 段落结尾：同样的结尾字串可能出现好几次（学术文章常重复同一句型），取最接近“开头 + 段落长度”的那一个
-            expect = a + len(plain) - skipped - 1
-            b, hit = -1, (text.find(tail, a) if tail else -1)
-            while hit >= 0:
-                if b < 0 or abs(hit + len(tail) - 1 - expect) < abs(b + len(tail) - 1 - expect):
-                    b = hit
-                hit = text.find(tail, hit + 1)
-            end = b + len(tail) - 1 if b >= 0 else min(a + len(plain) - skipped, len(idx) - 1)
-            boxes = _boxes(chars, idx, a, end)
-            layout[bid] = {"page": pn, "box": _bounds(boxes), "src": "text" if b >= 0 else "head"}
-            if len(boxes) > 1:
-                layout[bid]["boxes"] = boxes
-            if block.get("type") in ("figure", "table"):
-                layout[bid]["cap"] = _bounds(boxes)  # 题注本身的位置；图的区域之后会往外扩，裁图时要把题注切掉
-            if detail:
-                snts = _snts(block, text, idx, chars, a, end)
-                if snts:
-                    layout[bid]["snts"] = snts
-                words = _words(block, text, idx, chars, a, end)
-                if words:
-                    layout[bid]["words"] = words
-            cursor[pn] = end
-            break
+        try:
+            _locate_block(block, layout, cursor, stream, page_text, total, detail)
+        except Exception:  # noqa: BLE001 —— 一段对不上（格式怪、文字层异常）不要连累整篇都没有原页框
+            from .log import log
+            log.exception("定位段落失败 %s %s", root.name, block.get("id"))
     _extend_captioned(paper.get("blocks", []), layout, root)
     _clamp_overlaps(layout)
     _fill_gaps(paper.get("blocks", []), layout)
@@ -461,6 +413,63 @@ def _locate(root: Path, detail: bool = True) -> dict:
     # 只算了段落框时记成 “版本-lite”，打开阅读页（refresh_layout）看到版本不同就会补算逐句、逐字
     (extract_dir / "locate.version").write_text(LOCATE_VERSION if detail else LOCATE_VERSION + "-lite", encoding="utf-8")
     return layout
+
+
+def _locate_block(block: dict, layout: dict, cursor: dict, stream, page_text, total: int, detail: bool) -> None:
+    """一个块在原页上的位置，写进 layout（见 _locate）。"""
+    bid, page = block.get("id"), block.get("page")
+    if not bid or not page:
+        return
+    if block.get("box"):
+        layout[bid] = {"page": page, "box": block["box"], "src": "manual"}
+        return
+    head, tail = _anchors(block_english(block))
+    if not head:
+        return
+    heads = [head]
+    if block.get("type") == "heading" and block.get("num"):
+        heads.insert(0, _anchors(f"{block['num']} {block.get('en', '')}")[0])
+    # 模型给的页码偶尔会错（跨页的段落、没认出页眉的页）：先找它说的那页和下一页，
+    # 找不到再往前后各页找。远处的页只认够长的开头，免得短句子撞到别处的同样字词。
+    plain = _norm(_MATH.sub(" ", block_english(block)))
+    near = (page, page + 1)
+    far = sorted((n for n in range(1, total + 1) if n not in near), key=lambda n: (abs(n - page), n))
+    for pn in near + tuple(far):
+        if pn not in near:
+            if len(plain) < 20:
+                break  # 太短的字在别页很容易撞到一样的，不往远处找
+            if _find_start(page_text(pn), plain, [head if len(head) >= 20 else ""]) < 0:
+                continue
+        st = stream(pn)
+        if not st:
+            continue
+        text, idx, chars = st
+        a, skipped = _find_start_skip(text, plain, heads, cursor.get(pn, 0) if pn == page else 0)
+        if a < 0:
+            continue
+        # 段落结尾：同样的结尾字串可能出现好几次（学术文章常重复同一句型），取最接近“开头 + 段落长度”的那一个
+        expect = a + len(plain) - skipped - 1
+        b, hit = -1, (text.find(tail, a) if tail else -1)
+        while hit >= 0:
+            if b < 0 or abs(hit + len(tail) - 1 - expect) < abs(b + len(tail) - 1 - expect):
+                b = hit
+            hit = text.find(tail, hit + 1)
+        end = b + len(tail) - 1 if b >= 0 else min(a + len(plain) - skipped, len(idx) - 1)
+        boxes = _boxes(chars, idx, a, end)
+        layout[bid] = {"page": pn, "box": _bounds(boxes), "src": "text" if b >= 0 else "head"}
+        if len(boxes) > 1:
+            layout[bid]["boxes"] = boxes
+        if block.get("type") in ("figure", "table"):
+            layout[bid]["cap"] = _bounds(boxes)  # 题注本身的位置；图的区域之后会往外扩，裁图时要把题注切掉
+        if detail:
+            snts = _snts(block, text, idx, chars, a, end)
+            if snts:
+                layout[bid]["snts"] = snts
+            words = _words(block, text, idx, chars, a, end)
+            if words:
+                layout[bid]["words"] = words
+        cursor[pn] = end
+        break
 
 
 def refresh_layout(root: Path) -> None:

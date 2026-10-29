@@ -214,3 +214,7 @@ body.pv-open .blk.pv-pair::before { background: rgba(214, 160, 40, .8); opacity:
 .jump-back:hover { filter: brightness(1.08); }
 :root[data-theme="dark"] .jump-back { color: #10201f; }
 @media (max-width: 760px) { .jump-back { left: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); } }
+/* PDF 面板：这段在原页上没有位置时的提示与“重新对位” */
+.pv-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 10px 0; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent); font: 12.5px/1.6 var(--ui); color: var(--ink-2); }
+.pv-hint[hidden] { display: none; }
+.pv-hint span:not(.spin) { flex: 1 1 200px; }

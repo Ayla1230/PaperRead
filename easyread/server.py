@@ -538,6 +538,19 @@ class Handler(BaseHTTPRequestHandler):
                     ws.update("paper", lambda p: (p.pop("variables", None), p)[1])
                     return self._json(200, {"variables": None})
                 return self._json(200, {"variables": variables.extract(ws, config.load())})
+            if action == "relocate":  # 原页对位：重算每段在原 PDF 上的位置；缺文字资料就先重抽，算完回报对上几段
+                from . import pdfwork
+                if (ws.load("job") or {}).get("state") in ("queued", "running"):
+                    raise ValueError(tr("翻译还在进行，译完会自动对位"))
+                extract_dir = ws.root / "extract"
+                if not any(extract_dir.glob("page-*.chars.json")):
+                    pdfwork.extract_text(ws.source_pdf, extract_dir)
+                layout = pdfwork.locate(ws.root)
+                blocks = [b for b in (ws.load("paper") or {}).get("blocks", []) if b.get("type") in ("para", "heading", "list") and b.get("page")]
+                letters = sum(len(pdfwork._norm((extract_dir / f.name).read_text(encoding="utf-8", errors="replace")))
+                              for f in sorted(extract_dir.glob("page-*.txt"))[:3])
+                return self._json(200, {"layout": layout, "located": sum(1 for b in blocks if b["id"] in layout), "total": len(blocks),
+                                        "text_layer": letters > 200})
             if action == "discussion_del":
                 return self._json(200, {"deleted": paperdata.delete_discussion(ws, str(body.get("id", "")))})
             if action == "smart-annotate":
