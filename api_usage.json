@@ -24,7 +24,7 @@
    "day": "2026-10-29",
    "models": {
     "fake": {
-     "calls": 10,
+     "calls": 15,
      "input": 0,
      "output": 0
     }
@@ -39,7 +39,7 @@
    "day": "2023-11-15",
    "models": {
     "fake": {
-     "calls": 45,
+     "calls": 50,
      "input": 0,
      "output": 0
     }
@@ -206,6 +206,26 @@
    },
    "exhausted": {},
    "name": "127.0.0.1:44663",
+   "tz": "local",
+   "free": false,
+   "usage_url": ""
+  },
+  "127.0.0.1:42331": {
+   "day": "2026-10-29",
+   "models": {
+    "m": {
+     "calls": 3,
+     "input": 0,
+     "output": 0
+    },
+    "fixed-temp": {
+     "calls": 1,
+     "input": 0,
+     "output": 0
+    }
+   },
+   "exhausted": {},
+   "name": "127.0.0.1:42331",
    "tz": "local",
    "free": false,
    "usage_url": ""

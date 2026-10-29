@@ -113,9 +113,31 @@ def _taken(ws: Workspace, batch: list[int]) -> set[str]:
     return {b["id"] for b in ws.load("paper").get("blocks", []) if b.get("page") not in batch}
 
 
-def _problems(data: dict) -> list[str]:
+def _problems(data: dict, target: str = "") -> list[str]:
     problems, tex = block_problems(data["blocks"])
-    return problems + tex_problems(tex)
+    return problems + untranslated_tables(data["blocks"], target) + tex_problems(tex)
+
+
+_CJK = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]")
+_WORD = re.compile(r"[A-Za-z]{3,}")
+
+
+def untranslated_tables(blocks: list[dict], target: str) -> list[str]:
+    """译成中日韩文时，表头的文字全是英文（模型把整张表照抄）：请模型补译。人名、年份、数字留原文不算。"""
+    if target not in ("zh", "zh-TW", "ja", "ko"):
+        return []
+    out = []
+    for b in blocks:
+        if b.get("type") != "table":
+            continue
+        cells = [str(c) for row in (b.get("head") or []) for c in (row if isinstance(row, list) else [row]) if c]
+        if len(cells) < 2:  # 没有表头：看全部单元格
+            cells = [str(c) for row in (b.get("rows") or []) for c in (row if isinstance(row, list) else [row]) if c]
+        words = [c for c in cells if _WORD.search(c)]
+        if len(words) >= 2 and not any(_CJK.search(c) for c in words):
+            name = langs.prompt_name(target)
+            out.append(f"{b.get('id')}：表格的表头和单元格还是英文，请把文字译成{name}（数字、年份、人名、文献引用、变量代号保留原文）")  # i18n-ok: 给模型的修正说明
+    return out
 
 
 def journal(ws: Workspace, line: str) -> None:
@@ -184,13 +206,14 @@ def _one_batch(ws: Workspace, cfg: dict, batch: list[int], total_pages: int, can
         (ws.root / "extract" / f"failed-{batch[0]:03d}.txt").write_text(text, encoding="utf-8")
         raise
     data = _normalize(data, batch, _taken(ws, batch))
-    problems = _problems(data)
+    target = langs.of_paper(ws.load("paper").get("meta"))
+    problems = _problems(data, "" if read else target)
     if problems:  # 给一次修的机会
         say(tr("第 {page} 页起有 {n} 处公式或格式问题，正在让模型修正", page=batch[0], n=len(problems)))
         try:
             fixed = engines.parse_json(engines.run(cfg, prompts.repair(prompts.dump(data), problems, langs.of_paper(ws.load("paper").get("meta"))), ws.root, None, cancel, meter, json_mode=True))
             fixed = _normalize(fixed, batch, _taken(ws, batch))
-            if fixed["blocks"] and retains_content(data, fixed) and len(_problems(fixed)) < len(problems):
+            if fixed["blocks"] and retains_content(data, fixed) and len(_problems(fixed, "" if read else target)) < len(problems):
                 data = fixed
         except engines.EngineError as e:
             journal(ws, tr("第 {pages} 页修正失败，保留原译：{err}", pages=batch, err=e))
