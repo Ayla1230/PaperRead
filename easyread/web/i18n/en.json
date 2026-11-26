@@ -2252,5 +2252,7 @@
   "今天 {model} 的免费额度用完了（{reset}重置）。可以到设置把模型换成免费额度较多的 Gemini Flash-Lite，或等重置后按“继续翻译剩下的页”。": "Today's free quota for {model} is used up (resets {reset}). Switch to Gemini Flash-Lite, which has a larger free quota, in Settings, or press \"Continue with the remaining pages\" after the reset.",
   "模型拒绝回答（Google 的内容过滤：{reason}）": "The model refused to answer (Google content filter: {reason})",
   "推荐免费使用：免费额度较多（每天约 500 次）、最快": "Recommended for free use: larger free quota (about 500 requests a day), fastest",
-  "翻得较好，但免费额度很少（每天约 20 次，一篇就可能用完）": "Better translations, but a very small free quota (about 20 requests a day; one paper can use it up)"
+  "翻得较好，但免费额度很少（每天约 20 次，一篇就可能用完）": "Better translations, but a very small free quota (about 20 requests a day; one paper can use it up)",
+  "原图": "Original",
+  "翻译版（滑鼠停在字上看原文）": "Translated (hover a label to see the original)"
 }

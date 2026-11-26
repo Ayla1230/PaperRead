@@ -20,6 +20,8 @@ def refresh_layout(ws) -> None:
             # 旧论文或连结的 PDF 缺每页的文字位置资料：重抽一次，不然右边的原页永远跟随不了
             pdfwork.extract_text(ws.source_pdf, extract_dir)
         pdfwork.refresh_layout(ws.root)
+        from . import figure_overlay
+        figure_overlay.refresh(ws)  # 图内文字补上在图上的位置（翻译版的图）
     except Exception:  # noqa: BLE001
         log.exception("重算原页定位失败 %s", ws.root)
     try:

@@ -160,6 +160,21 @@
       } else if (ask) {
         imageText = '<div class="fig-text-ask">' + ask + "</div>";
       }
+      // 翻译版的图：图内文字知道在图上的位置（ibox）时，在原图旁边画一张把英文换成译文的图。
+      // 单张图放右边对照；多张小图拼成的大图放下面（并排太小看不清）
+      const placed = b.src ? labels.filter((x) => Array.isArray(x.ibox) && x.zh) : [];
+      if (placed.length) {
+        const multi = Array.isArray(b.image_panels) && b.image_panels.length >= 2 || new Set(labels.map((x) => x.panel).filter(Boolean)).size >= 2;
+        const over = placed.map((x) => {
+          const [x0, y0, x1, y1] = x.ibox;
+          const tall = (y1 - y0) > (x1 - x0) * 1.6;  // 直的 Y 轴名：中文直排
+          return '<span class="fl-ov' + (tall ? " tall" : "") + '" style="left:' + (x0 * 100).toFixed(2) + "%;top:" + (y0 * 100).toFixed(2) + "%;width:" + ((x1 - x0) * 100).toFixed(2) +
+            "%;height:" + ((y1 - y0) * 100).toFixed(2) + '%" title="' + PR.esc(x.en || "") + '">' + PR.md(x.zh, { cite: false, xref: false }) + "</span>";
+        }).join("");
+        return '<div class="fig-pair' + (multi ? " stacked" : "") + '"><div class="figure-media">' + img + '<div class="fig-pair-label">' + PR.t("原图") + "</div></div>" +
+          '<div class="figure-media fig-tr"><div class="fig-tr-in"><img src="' + PR.imageUrl(b.src) + '" alt="" loading="lazy">' + over + "</div>" +
+          '<div class="fig-pair-label">' + PR.t("翻译版（滑鼠停在字上看原文）") + "</div></div></div>" + imageText + captionHtml(b);
+      }
       return '<div class="figure-media">' + img + '</div>' + imageText + captionHtml(b);
     },
     note: (b) => '<div class="inline-note"><div class="lbl">' + PR.t("阅读批注（非原文）") + "</div>" + PR.mdBlocks(b.zh) + "</div>",

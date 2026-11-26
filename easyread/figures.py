@@ -140,11 +140,24 @@ def prepare_figures(root, blocks: list[dict], total_pages: int) -> None:
             log.exception("截图失败 %s 第 %s 页", block.get("id"), page)
 
 
+def _thin_box(value) -> list[float] | None:
+    """题注、文字行这类扁的框：只要是有限数、方向对就收。"""
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        return None
+    try:
+        b = [float(x) for x in value]
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not all(math.isfinite(x) for x in b) or b[2] <= b[0] or b[3] <= b[1]:
+        return None
+    return b
+
+
 def _display_box(box: list[float], loc: dict, layout: dict, page: int) -> list[float] | None:
     """自动裁图的范围（layout 里图的区域）包含题注，四周还留了一点边，常会带到题注和上下正文的一行字。
     题注在译文里另外显示，正文也在旁边：把这些从图片里切掉。"""
     x0, y0, x1, y1 = box
-    cap = figure_box(loc.get("cap")) if loc.get("cap") else None
+    cap = _thin_box(loc.get("cap"))  # 一行题注不到页高 2%：不能用 figure_box 检查（会被当成太小丢掉，题注就切不掉）
     if cap and cap[0] < x1 and cap[2] > x0 and cap[1] < y1 and cap[3] > y0:
         if (cap[1] + cap[3]) / 2 > (y0 + y1) / 2:
             y1 = min(y1, cap[1] - 0.004)   # 题注在下面
@@ -202,10 +215,11 @@ def missing(ws) -> list[tuple[str, int, list[float]]]:
 
 def fill(ws) -> int:
     """补截或更新自动截图；写回时保留截图期间发生的编辑和重译。"""
-    done = {}
+    done, boxes = {}, {}
     for block, page, box in _pending(ws):
         try:
             done[block["id"]] = (block, crop(ws.root, page, box))
+            boxes[block["id"]] = box
         except Exception:  # noqa: BLE001
             log.exception("截图失败 %s %s", ws.root, block["id"])
     if done:
@@ -215,6 +229,11 @@ def fill(ws) -> int:
                 previous, src = done.get(b.get("id"), (None, None))
                 if b == previous:
                     b["src"] = src
+                    box = boxes.get(b.get("id"))
+                    if box:
+                        b["crop"] = [round(float(v), 4) for v in box]  # 截图在原页的范围：翻译版的图用来对位
+                        from .figure_overlay import place
+                        place(ws.root, b, b["crop"])
                     count += 1
             return count
         return ws.update("paper", apply)

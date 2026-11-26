@@ -64,7 +64,7 @@
     const src = srcOf(n);
     if (entry.img.getAttribute("src") === src) return;
     entry.node.classList.add("loading");
-    entry.img.onload = () => entry.node.classList.remove("loading");
+    entry.img.onload = () => { entry.node.classList.remove("loading"); reflowUntil = Date.now() + 800; };  // 页图载入改变高度：接下来的 scroll 不是人捲的
     entry.img.setAttribute("src", src);
   }
   function loadNearby(n) {
@@ -106,7 +106,7 @@
   }
   // 右边的面板真的被人滚动（滚轮、拖、按键）才让左边跟过去；换页图载入、自动捲动造成的 scroll 不算，
   // 不然图载入时页面变高，左边会被拉着乱跳
-  let panelInput = false, programmaticUntil = 0, panelTouched = 0;
+  let panelInput = false, programmaticUntil = 0, panelTouched = 0, reflowUntil = 0;
   ["wheel", "pointerdown", "touchstart", "touchmove", "keydown"].forEach(type => scroller.addEventListener(type, () => {
     panelInput = true;
     panelTouched = Date.now();
@@ -145,8 +145,11 @@
   }
   scroller.addEventListener("scroll", () => {
     if (!pageNodes.length || PR.side !== "pages") return;
-    panelInput = Date.now() - panelTouched < 1200 && Date.now() >= programmaticUntil;
-    if (panelInput) holdUntil = Date.now() + 2000;
+    // 有人碰过面板（滚轮、拖、按键）就算；没碰过的 scroll（原生捲轴拖曳不一定有 pointerdown）也算，
+    // 除了自动捲动和页图载入造成的（不然图一载入左边就被拉着跳）
+    const now = Date.now();
+    panelInput = now - panelTouched < 1200 || (now >= programmaticUntil && now >= reflowUntil);
+    if (panelInput) holdUntil = now + 2000;
     const middle = scroller.getBoundingClientRect().top + scroller.clientHeight / 2;
     const entry = pageNodes.find(p => p.node.getBoundingClientRect().bottom > middle) || pageNodes[pageNodes.length - 1];
     pvPage = Number(entry.node.dataset.n);

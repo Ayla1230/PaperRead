@@ -29,6 +29,21 @@ def _panel(value) -> str:
     return text if re.fullmatch(r"[a-z]{1,2}|[ivx]{1,4}|\d{1,2}[a-z]?", text) else ""
 
 
+def _box(v) -> list[float] | None:
+    """[x0,y0,x1,y1]，0~1。模型偶尔给 0~1000 的整数（Gemini 的习惯）或 [y0,x0,y1,x1]：只收 0~1、左上在右下前面的。"""
+    if not isinstance(v, (list, tuple)) or len(v) != 4:
+        return None
+    try:
+        b = [float(x) for x in v]
+    except (TypeError, ValueError):
+        return None
+    if max(b) > 1.5 and max(b) <= 1000:
+        b = [x / 1000 for x in b]
+    if not (0 <= b[0] < b[2] <= 1.001 and 0 <= b[1] < b[3] <= 1.001):
+        return None
+    return [round(x, 4) for x in b]
+
+
 def normalize_labels(raw) -> list[dict]:
     """模型给的标签整理成固定格式；空的、重复的丢掉，最多 MAX_LABELS 项。"""
     if not isinstance(raw, list):
@@ -50,7 +65,12 @@ def normalize_labels(raw) -> list[dict]:
         if key in seen:
             continue
         seen.add(key)
-        out.append({"panel": panel, "role": role, "en": en, "zh": zh} if panel else {"role": role, "en": en, "zh": zh})
+        lab = {"panel": panel, "role": role, "en": en, "zh": zh} if panel else {"role": role, "en": en, "zh": zh}
+        for k in ("box", "pbox", "ibox"):  # 标签在图上的位置（翻译版的图用）：box 相对截图，pbox 整页坐标，ibox 程序算好的
+            v = _box(item.get(k))
+            if v:
+                lab[k] = v
+        out.append(lab)
         if len(out) >= MAX_LABELS:
             break
     return out
@@ -95,13 +115,14 @@ def prompt(block: dict, target: str, image_hint: str = "") -> str:
         "這張圖如果由多張小圖組成（圖上印著 (a)、(b)… 或 A、B…），每一項都要標上 panel（只寫圖上印的編號，例如 a、g），"  # i18n-ok
         "依小圖的順序逐一列出，每張小圖的軸名、圖例各自列；單張圖 panel 留空。"  # i18n-ok
         "圖上沒有印編號、但明顯是並排的幾張小圖時，panel 依位置從左到右、從上到下寫 1、2、3…。"  # i18n-ok
+        "每一項加 box：這段文字在這張圖上的位置 [x0, y0, x1, y1]（左上、右下，0 到 1，相對整張圖片；框住文字本身就好）。"  # i18n-ok
         "有多張小圖時，另外用 panels 寫出每張小圖在整張圖裡的位置：第幾列 row、第幾欄 col（從 1 起算，左上角是 row 1、col 1；例如 3×3 九宮格右下角是 row 3、col 3）。"  # i18n-ok
         "數學符號、上下標、單位一律寫成 $TeX$（例如 $j$ (mA cm$^{-2}$)、$Z'$ ($\\Omega$)），en 和 zh 用同樣的寫法。"  # i18n-ok
         "看不清楚或圖裡沒有的就不要列，不要猜，也不要把題注抄進來。專有名詞與縮寫保留原文。\n"  # i18n-ok
         + (image_hint + "\n" if image_hint else "") +
         "只輸出一個 JSON 物件，不要任何別的文字：\n"  # i18n-ok
         '{"labels": [{"panel": "a", "role": "x", "en": "Year", "zh": "年份"}, {"panel": "a", "role": "y", "en": "Cumulative abnormal return (%)", "zh": "累積異常報酬（%）"}, '  # i18n-ok
-        '{"panel": "b", "role": "y", "en": "$j$ (mA cm$^{-2}$)", "zh": "電流密度 $j$ (mA cm$^{-2}$)"}], '  # i18n-ok
+        '{"panel": "b", "role": "y", "en": "$j$ (mA cm$^{-2}$)", "zh": "電流密度 $j$ (mA cm$^{-2}$)", "box": [0.52, 0.2, 0.55, 0.7]}], '  # i18n-ok
         '"panels": [{"panel": "a", "row": 1, "col": 1}, {"panel": "b", "row": 1, "col": 2}]}'  # i18n-ok
     )
 
@@ -165,6 +186,8 @@ def extract(ws, block_id: str, cfg: dict, cancel=None, meter=None) -> list[dict]
                         b.pop("image_panels", None)
                     b["image_en"] = joined(labels, "en")
                     b["image_zh"] = joined(labels, "zh")
+                    from .figure_overlay import crop_of, place
+                    place(ws.root, b, crop_of(b, ws.load("layout") or {}))
                     if not b.get("src") and str(image).startswith(str(ws.root)):
                         b["src"] = image.relative_to(ws.root).as_posix()
             return p
