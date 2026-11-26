@@ -20,9 +20,13 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Iterator
 
-from . import __version__, http, usage
+from . import __version__, gemini_native, http, usage
 from .engines import Cancelled, EngineError
 from .i18n import tr
+
+
+class QuotaExhausted(EngineError):
+    """服务商说今天的额度用完了（Gemini 免费额度每天的次数）：再试也没用，翻译要整个停下来。"""
 
 def api_kinds() -> list[tuple[str, str]]:
     return [("chat", tr("Chat Completions（通用）")), ("responses", tr("Responses（OpenAI 新接口）"))]
@@ -92,14 +96,18 @@ def _body(o: dict, prompt: str, images: list[Path], stream: bool, temperature: f
 def _open(o: dict, body: dict, stream: bool):
     """发请求。有的模型（推理模型、Kimi K2 系列）不让改 temperature、有的接口不认 stream_options、reasoning_effort，报 400 时去掉再发。"""
     path = "/responses" if kind(o) == "responses" else "/chat/completions"
-    for _ in range(3):
-        req = urllib.request.Request(_base(o) + path, data=json.dumps(body).encode(), headers=_headers(o, stream))
+    native = gemini_native.is_native(o)
+    for _ in range(4):
+        target = gemini_native.url(o, stream) if native else _base(o) + path
+        req = urllib.request.Request(target, data=json.dumps(body).encode(), headers=gemini_native.headers(o, stream) if native else _headers(o, stream))
         try:
             return http.urlopen(req, timeout=int(o.get("timeout") or 600))
         except urllib.error.HTTPError as e:
             full = e.read(4000).decode("utf-8", "replace")  # Gemini 说明“每日额度用完”的 quotaId 在比较后面
             detail = full[:300]
             e.close()
+            if native and e.code == 400 and gemini_native.drop_rejected(body, detail):
+                continue
             drop = next((k for k in ("temperature", "stream_options", "reasoning_effort") if k in detail and k in body), None)
             if e.code == 400 and drop:
                 body = {k: v for k, v in body.items() if k != drop}
@@ -110,31 +118,51 @@ def _open(o: dict, body: dict, stream: bool):
 
 def _count(o: dict, meter, res: dict) -> None:
     """一次调用的用量：记进这次任务的 Meter，也记进首页“今日用量”（没有接口设置时只记 Meter）。"""
-    rec = usage.from_openai(res)
+    rec = usage.from_openai(gemini_native.as_openai_usage(res) if "usageMetadata" in (res or {}) else res)
     if meter is not None:
         meter.add(**rec)
     if o:
         usage.record(o, rec)
 
 
+def _daily_quota(e: urllib.error.HTTPError) -> bool:
+    return e.code == 429 and usage.daily_quota_hit(getattr(e, "detail_full", "") or getattr(e, "detail", ""))
+
+
 def _http_error(e: urllib.error.HTTPError, o: dict | None = None) -> EngineError:
-    if o is not None and e.code == 429 and usage.daily_quota_hit(getattr(e, "detail_full", "") or getattr(e, "detail", "")):
-        usage.record(o, exhausted=True)
+    if o is not None and _daily_quota(e):
+        full = getattr(e, "detail_full", "") or ""
+        usage.record(o, exhausted=True, limit=gemini_native.quota_value(full))
+        reset = usage.reset_text(o)
+        return QuotaExhausted(tr("今天 {model} 的免费额度用完了（{reset}重置）。可以到设置把模型换成免费额度较多的 Gemini Flash-Lite，或等重置后按“继续翻译剩下的页”。",
+                                 model=o.get("model") or "", reset=reset))
+    if e.code == 401 and o is not None and gemini_native.is_native(o):
+        return EngineError(tr("Google 不接受这把金钥（401）：请到 AI Studio 确认金钥没被删除、属于有启用 Gemini API 的专案，再重新贴上。"))
     return EngineError(tr("接口返回 {code}{hint}：{detail}", code=e.code, hint=_hint(e.code), detail=getattr(e, "detail", "")))
 
 
 # ---------- 一次拿到整段（翻译用） ----------
 def complete(o: dict, prompt: str, images: list[Path], cancel=None, meter=None, json_mode: bool = False) -> str:
-    body = _body(o, prompt, images, False, None if kind(o) == "responses" else 0.2, json_mode)
+    native = gemini_native.is_native(o)
+    body = gemini_native.body(o, prompt, images, 0.2, json_mode) if native else _body(o, prompt, images, False, None if kind(o) == "responses" else 0.2, json_mode)
     res = None
-    for attempt in range(4):  # 限流、服务端错误、网络抖动：等一会儿再试
+    limited = 0
+    for attempt in range(8):  # 限流、服务端错误、网络抖动：等一会儿再试
         if cancel is not None and cancel.is_set():
             raise Cancelled()
         try:
             res = _fetch(o, body, cancel)
             break
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503, 504) and attempt < 3:
+            if _daily_quota(e):  # 今天的额度用完了：再试也没用
+                raise _http_error(e, o)
+            if e.code == 429 and limited < 5:  # 每分钟限流（免费额度每分钟只有几次）：照服务商说的秒数等
+                limited += 1
+                wait = gemini_native.retry_delay(getattr(e, "detail_full", ""))
+                wait = wait + 1 if wait is not None else _retry_after(e.headers.get("Retry-After"), 5 * 2 ** (limited - 1))
+                _sleep(wait, cancel)
+                continue
+            if e.code in (500, 502, 503, 504) and attempt < 3:
                 _sleep(_retry_after(e.headers.get("Retry-After"), 5 * 2 ** attempt), cancel)
                 continue
             raise _http_error(e, o)
@@ -145,6 +173,8 @@ def complete(o: dict, prompt: str, images: list[Path], cancel=None, meter=None, 
             raise EngineError(tr("连不上接口：{err}", err=e))
     if isinstance(res, dict):
         _count(o, meter, res)
+    if native:
+        return gemini_native.text(res, _truncated)
     return _responses_text(res) if kind(o) == "responses" else _chat_text(res)
 
 
@@ -239,7 +269,8 @@ def _sleep(seconds: float, cancel) -> None:
 def stream(o: dict, text: str, cancel, meter=None, images: list[Path] | None = None) -> Iterator[str]:
     if cancel.is_set():
         raise Cancelled()
-    body = _body(o, text, images or [], True, None if kind(o) == "responses" else 0.4)
+    native = gemini_native.is_native(o)
+    body = gemini_native.body(o, text, images or [], 0.4) if native else _body(o, text, images or [], True, None if kind(o) == "responses" else 0.4)
     try:
         r = _open(o, body, True)
     except urllib.error.HTTPError as e:
@@ -249,7 +280,8 @@ def stream(o: dict, text: str, cancel, meter=None, images: list[Path] | None = N
     with r:
         if cancel.is_set():
             raise Cancelled()
-        pieces = _responses_pieces(r, cancel, meter, o) if kind(o) == "responses" else _chat_pieces(r, cancel, meter, o)
+        pieces = (_native_pieces(r, cancel, meter, o) if native else
+                  _responses_pieces(r, cancel, meter, o) if kind(o) == "responses" else _chat_pieces(r, cancel, meter, o))
         yield from _strip_think(pieces)
 
 
@@ -328,6 +360,22 @@ def _chat_pieces(r, cancel, meter=None, o: dict | None = None) -> Iterator[str]:
         usage.record(o, {})
 
 
+def _native_pieces(r, cancel, meter, o: dict) -> Iterator[str]:
+    """Gemini 原生串流：每个事件是一段 GenerateContentResponse，最后一段带 finishReason 和 usageMetadata。"""
+    last = None
+    for ev in _events(r, cancel):
+        if ev is None:
+            break
+        if ev.get("error"):
+            raise EngineError(tr("接口返回出错：{err}", err=ev["error"]))
+        last = ev
+        yield gemini_native.piece(ev)
+    if last is None:
+        raise EngineError(tr("接口连接提前结束，回答未完成，请重试。"))
+    gemini_native.check(last, _truncated)
+    _count(o, meter, last if "usageMetadata" in last else {"usageMetadata": {}})
+
+
 def _responses_pieces(r, cancel, meter=None, o: dict | None = None) -> Iterator[str]:
     for ev in _events(r, cancel):
         t = (ev or {}).get("type", "")
@@ -378,7 +426,9 @@ def models(o: dict) -> list[str]:
     base = (o.get("base_url") or "").strip().rstrip("/")
     if not base:
         raise EngineError(tr("先填接口地址"))
-    req = urllib.request.Request(base + "/models", headers=_headers(o))
+    native = gemini_native.is_native(o)
+    req = urllib.request.Request(gemini_native.root(o) + "/models?pageSize=200" if native else base + "/models",
+                                 headers=gemini_native.headers(o) if native else _headers(o))
     try:
         with http.urlopen(req, timeout=20) as r:
             res = json.loads(r.read())
@@ -390,6 +440,8 @@ def models(o: dict) -> list[str]:
         raise EngineError(tr("连不上接口：{err}", err=e))
     except json.JSONDecodeError:
         raise EngineError(tr("这个地址不提供模型列表，手填模型名"))
+    if native:
+        return gemini_native.model_list(res)
     items = res.get("data") if isinstance(res, dict) else res
     if not isinstance(items, list):  # Gemini 的旧格式是 {"models": [...]}
         items = (res or {}).get("models") or []

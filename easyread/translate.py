@@ -9,7 +9,7 @@ import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from . import blank_pages, consistency, engines, front_context, langs, netcheck, page_check, pdfwork, prompts, prompts_en, segments, sentences, sources, terms
+from . import blank_pages, consistency, engines, front_context, gemini_native, langs, netcheck, page_check, pdfwork, prompts, prompts_en, segments, sentences, sources, terms
 from .checks import block_problems, tex_problems
 from .repair_guard import retains_content
 from .figures import normalize_figure, prepare_figures
@@ -329,6 +329,8 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
     k = segments.workers(cfg.get("concurrency"), n_batches)
     if speed != "standard":  # 快速：每批各自一段，全部同时送（最多 8 段）；调用次数不变，每段多带一点前文
         k = max(k, min(segments.MAX_LANES, n_batches))
+    elif cfg.get("engine") == "openai" and gemini_native.is_native(cfg.get("openai") or {}) and not cfg.get("concurrency"):
+        k = min(k, 2)  # Gemini 免费额度每分钟只有约 5 次：标准速度最多同时 2 段，免得一开始就被限流
     lanes = [_batches(seg, size, en_pages) for seg in segments.plan(pages, size, k, ws.root)]
     batches = [b for lane in lanes for b in lane]
     verb = tr("正在整理原文") if read else tr("正在翻译")
@@ -409,7 +411,7 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
                 log.warning("翻译失败 %s %s: %s", ws.id, todo, err[:300])
                 if cancel.is_set():
                     raise engines.Cancelled()
-                if _QUOTA.search(err) or netcheck.offline(err):
+                if type(e).__name__ == "QuotaExhausted" or _QUOTA.search(err) or netcheck.offline(err):
                     state["quota"] = err[:300]
                     journal(ws, tr("额度用完或连不上，停止翻译剩下的页"))
                     break

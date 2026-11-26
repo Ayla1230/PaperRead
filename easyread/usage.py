@@ -10,6 +10,7 @@ import time
 
 from . import config
 from .store import read_json, write_json_atomic
+from .i18n import tr
 
 
 class Meter:
@@ -181,7 +182,16 @@ def _fresh(entry: dict, tz: str, now: float) -> dict:
     return entry
 
 
-def record(o: dict, rec: dict | None = None, exhausted: bool = False, now: float | None = None) -> None:
+def reset_text(o: dict, now: float | None = None) -> str:
+    """“今天 15:00 ”“明天 16:00 ”：这个服务商下次重置的本机时间。"""
+    now = time.time() if now is None else now
+    _, reset = _window(provider_of(o)["tz"], now)
+    when = _dt.datetime.fromtimestamp(reset)
+    day = tr("今天") if when.date() == _dt.datetime.fromtimestamp(now).date() else tr("明天")
+    return f"{day} {when:%H:%M} "
+
+
+def record(o: dict, rec: dict | None = None, exhausted: bool = False, now: float | None = None, limit: int | None = None) -> None:
     """记一次 API 调用；exhausted=True 表示服务商说今天的额度用完了。出错只跳过，不影响翻译。"""
     try:
         now = time.time() if now is None else now
@@ -194,6 +204,8 @@ def record(o: dict, rec: dict | None = None, exhausted: bool = False, now: float
             if exhausted:
                 entry["exhausted"][model] = True
                 m["limited"] = m.get("limited", 0) + 1
+                if limit and not (data.get("limits") or {}).get(prov["id"] + "/" + model):  # 服务商说了每日上限：自动填进去（使用者自己填的不改）
+                    data.setdefault("limits", {})[prov["id"] + "/" + model] = int(limit)
             else:
                 m["calls"] += 1
                 m["input"] += int((rec or {}).get("input") or 0)
