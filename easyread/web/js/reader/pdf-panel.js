@@ -104,9 +104,12 @@
   function pageTop(node) {
     return node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
   }
-  let panelInput = false, programmaticUntil = 0;
-  ["wheel", "pointerdown", "touchstart", "keydown"].forEach(type => scroller.addEventListener(type, () => {
+  // 右边的面板真的被人滚动（滚轮、拖、按键）才让左边跟过去；换页图载入、自动捲动造成的 scroll 不算，
+  // 不然图载入时页面变高，左边会被拉着乱跳
+  let panelInput = false, programmaticUntil = 0, panelTouched = 0;
+  ["wheel", "pointerdown", "touchstart", "touchmove", "keydown"].forEach(type => scroller.addEventListener(type, () => {
     panelInput = true;
+    panelTouched = Date.now();
     holdUntil = Date.now() + 2000;
   }, { passive: true }));
   scroller.addEventListener("scrollend", () => { programmaticUntil = 0; });
@@ -142,8 +145,7 @@
   }
   scroller.addEventListener("scroll", () => {
     if (!pageNodes.length || PR.side !== "pages") return;
-    // Native scrollbar drags can emit scroll without a DOM pointerdown.
-    if (Date.now() >= programmaticUntil) panelInput = true;
+    panelInput = Date.now() - panelTouched < 1200 && Date.now() >= programmaticUntil;
     if (panelInput) holdUntil = Date.now() + 2000;
     const middle = scroller.getBoundingClientRect().top + scroller.clientHeight / 2;
     const entry = pageNodes.find(p => p.node.getBoundingClientRect().bottom > middle) || pageNodes[pageNodes.length - 1];
@@ -342,21 +344,33 @@
     const blk = snt.closest(".blk");
     if (!zh || !zh.dataset.key || !blk) return;
     holdUntil = Date.now() + 1500;  // 别让滚动跟随马上换掉
-    const id = blk.dataset.id;
-    if (PR.showSentence(id, zh.dataset.key, Number(snt.dataset.s), true)) return;
-    // 这一句在原页上没对到（扫描档、跨页的那一截）：至少框出整段
+    clearTimeout(hoverOut);
+    const id = blk.dataset.id, key = zh.dataset.key, i = Number(snt.dataset.s);
+    // 滑过就先换框（不捲动）；停在这句 0.35 秒才把右边捲过去，鼠标划过一串句子时右边不会跟着乱跳
+    clearTimeout(hoverDwell);
+    if (PR.showSentence(id, key, i, false)) {
+      hoverDwell = setTimeout(() => { if (sentShown && sentShown.id === id && sentShown.key === key && sentShown.i === i) PR.showSentence(id, key, i, true); }, 350);
+      return;
+    }
+    // 这一句在原页上没对到（扫描档、跨页的那一截）：停一下再框出整段
     const loc = S.layout[id];
-    if (loc && pvBlock !== id) { pvBlock = id; showPage(loc.page, id); }
+    if (loc && pvBlock !== id) hoverDwell = setTimeout(() => { pvBlock = id; showPage(loc.page, id); }, 350);
   });
+  let hoverDwell = 0, hoverOut = 0;
   document.addEventListener("mouseout", (e) => {
-    if (!sentShown || sentShown.fromPdf || PR.side !== "pages") return;
+    if (PR.side !== "pages") return;
     const from = e.target.closest && e.target.closest("#paper .snt");
     const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest("#paper .snt");
-    if (from && !to) followSentence();
+    if (!from || to) return;
+    clearTimeout(hoverDwell);
+    if (!sentShown || sentShown.fromPdf) return;
+    // 离开句子：停一下再回到阅读位置那句，只换框不捲动（不然在句子间移动会来回跳）
+    clearTimeout(hoverOut);
+    hoverOut = setTimeout(() => followSentence(false), 700);
   });
   /* 滚动时跟随：阅读线（视口上方 30%）穿过的那一句 */
-  function followSentence() {
-    if (PR.side !== "pages" || !PR.$(".pv-follow input").checked || Date.now() < holdUntil) return;
+  function followSentence(scroll = true) {
+    if (PR.side !== "pages" || !PR.$(".pv-follow input").checked || Date.now() < holdUntil && scroll) return;
     const id = PR.readingBlock && PR.readingBlock();
     const blk = id && document.getElementById("b-" + id);
     const loc = S.layout[id];
@@ -377,7 +391,7 @@
       }
     }
     if (!hit) { const first = Object.keys(loc.snts)[0]; hit = first ? { key: first, i: 0 } : null; }
-    if (hit) PR.showSentence(id, hit.key, hit.i, true); else PR.clearSentence();
+    if (hit) PR.showSentence(id, hit.key, hit.i, scroll); else PR.clearSentence();
   }
   PR.syncSentence = PR.throttle ? PR.throttle(followSentence, 150) : followSentence;
 
