@@ -2254,5 +2254,13 @@
   "推荐免费使用：免费额度较多（每天约 500 次）、最快": "Recommended for free use: larger free quota (about 500 requests a day), fastest",
   "翻得较好，但免费额度很少（每天约 20 次，一篇就可能用完）": "Better translations, but a very small free quota (about 20 requests a day; one paper can use it up)",
   "原图": "Original",
-  "翻译版（滑鼠停在字上看原文）": "Translated (hover a label to see the original)"
+  "翻译版（滑鼠停在字上看原文）": "Translated (hover a label to see the original)",
+  "周日": "Sun",
+  "周一": "Mon",
+  "周二": "Tue",
+  "周三": "Wed",
+  "周四": "Thu",
+  "周五": "Fri",
+  "周六": "Sat",
+  "今天日期与时间": "Today's date and time"
 }
