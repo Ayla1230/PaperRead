@@ -23,9 +23,10 @@ class TableTranslatedTest(unittest.TestCase):
     def test_prompt_says_cells_must_be_translated(self):
         for target in ("zh-TW", "ja"):
             rule = prompts.rules(target)
-            self.assertIn("每个单元格里的文字都要译成", rule)
-            self.assertNotIn("一律照原文保留", rule)
-            self.assertIn("一定要列 `image_labels`", rule)
+            # zh-TW 的提示词会被转成繁体（装了 OpenCC 时），简繁都算
+            self.assertTrue(any(s in rule for s in ("每个单元格里的文字都要译成", "每個單元格裡的文字都要譯成")), rule[:200])
+            self.assertFalse(any(s in rule for s in ("一律照原文保留", "一律照原文保留")))
+            self.assertTrue(any(s in rule for s in ("一定要列 `image_labels`", "一定要列 `image_labels`")))
 
 
 class RepairFlowTest(unittest.TestCase):

@@ -1,6 +1,6 @@
 /* 首页翻卡时钟：标题右边一个翻卡式的时:分，旁边小字写日期和星期；分钟变了才翻。 */
 (function () {
-  const WD = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"].map((d) => PR.t(d));
+  const WD = [PR.t("周日"), PR.t("周一"), PR.t("周二"), PR.t("周三"), PR.t("周四"), PR.t("周五"), PR.t("周六")];
   function digit() {
     const d = document.createElement("span"); d.className = "fc-d";
     d.innerHTML = '<span class="h t"><span></span></span><span class="h b"><span></span></span><span class="h t flap"><span></span></span><span class="h b flap2"><span></span></span>';
